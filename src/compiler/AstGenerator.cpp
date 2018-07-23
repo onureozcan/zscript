@@ -1,0 +1,328 @@
+//
+// Created by onur on 12.07.2018.
+//
+
+#include "compiler.h"
+
+class AstGenerator {
+
+public:
+    ClassDeclaration *cls = NULL;
+
+    AstGenerator(zeroscriptParser::ClassDeclarationContext *classDeclaration) {
+
+        visitClassDeclaration(classDeclaration);
+
+    }
+
+    Var *visitVarDeclaration(zeroscriptParser::VariableDeclarationPartContext *part, Body *pKind) {
+        Var *var = new Var();
+        var->setIdentifier(part->variableName->IDENT()->getText().data());
+        if (part->expression()) {
+            var->value = visitExpression(part->expression(), pKind);
+        } else var->value = new EmptyExpression();
+        return var;
+    }
+
+    vector<Var *> *visitVar(zeroscriptParser::VarContext *varcontext, Body *pKind) {
+        vector<Var *> *vars = new vector<Var *>();
+        vector<zeroscriptParser::VariableDeclarationPartContext *> declarations = varcontext->variableDeclarationPart();
+        for (int i = 0; i < declarations.size(); i++) {
+            vars->push_back(visitVarDeclaration(declarations.at(i), pKind));
+        }
+        return vars;
+    }
+
+    TerminalExpression *visitIdent(zeroscriptParser::IdentifierContext *context, Body *pKind) {
+        return TerminalExpression::identifier(context->IDENT()->getText().data());
+    }
+
+    ArgumentList *visitArguments(zeroscriptParser::ArgumentsListContext *pContext, Body *pKind) {
+        ArgumentList *args = new ArgumentList();
+        vector<zeroscriptParser::IdentifierContext *> terminals = pContext->identifier();
+        for (int i = 0; i < terminals.size(); i++) {
+            args->addIdent(visitIdent(terminals.at(i), pKind));
+        }
+        return args;
+    }
+
+    Function *visitFunction(zeroscriptParser::FunctionContext *pContext, Body *pKind) {
+        Function *func = new Function();
+        func->setIdentifier(pContext->functionName->IDENT()->getText().data());
+        func->body = visitBody(pContext->body(), pKind);
+        func->arguments = visitArguments(pContext->argumentsList(), pKind);
+        return func;
+    }
+
+    Expression *visitAtom(zeroscriptParser::AtomContext *pContext, Body *pKind) {
+        if (pContext->identifier())
+            return TerminalExpression::identifier(pContext->identifier()->IDENT()->getText().data());
+        if (pContext->string()) return TerminalExpression::string(pContext->string()->STRING()->getText().data());
+        if (pContext->number()) {
+            if (pContext->number()->DECIMAL()) {
+                return TerminalExpression::number(pContext->number()->DECIMAL()->getText().data());
+            } else if (pContext->number()->INT()) {
+                return TerminalExpression::number(pContext->number()->INT()->getText().data());
+            } else if (pContext->number()->FALSE_()) {
+                return TerminalExpression::number("0");
+            } else if (pContext->number()->TRUE_()) {
+                return TerminalExpression::number("1");
+            }
+        }
+        if (pContext->json()) {
+            //TODO
+        }
+        return nullptr;
+    }
+
+    ExpressionList *visitExpressionList(zeroscriptParser::ExpressionListContext *pContext, Body *pKind) {
+        ExpressionList *expressions = new ExpressionList();
+        if (pContext != NULL)
+            for (auto &expr : pContext->expression()) {
+                expressions->addExpression(visitExpression(expr, pKind));
+            }
+        return expressions;
+    }
+
+    int counter = 0;
+
+    Expression *visitAnonymousFunction(zeroscriptParser::AnonymousFunctionContext *pContext, Body *pKind) {
+        std::string name = "$anonymous_" + std::to_string(++counter);
+        Function *func = new Function();
+        func->setIdentifier(name.data());
+        if (pContext->body()) {
+            func->body = visitBody(pContext->body(), pKind);
+        } else if (pContext->bodyOrExpression()->body()) {
+            func->body = visitBody(pContext->bodyOrExpression()->body(), pKind);
+        }
+        if (pContext->argumentsList()) {
+            func->arguments = visitArguments(pContext->argumentsList(), pKind);
+        } else {
+            func->arguments = new ArgumentList();
+            func->arguments->addIdent(
+                    TerminalExpression::identifier(pContext->identifier()->IDENT()->getText().data()));
+        }
+        Statement *stmt = new Statement();
+        stmt->stmt = func;
+        pKind->statements->push_back(stmt);
+        return TerminalExpression::identifier(name.data());
+    }
+
+    Expression *visitExpression(zeroscriptParser::ExpressionContext *pContext, Body *pKind) {
+        if (pContext->primaryExpresssion()) {
+            return visitPrimaryExpression(pContext->primaryExpresssion(), pKind);
+        } else if (pContext->bop) {
+            Expression *left = visitExpression(pContext->expression(0), pKind);
+            Expression *right = visitExpression(pContext->expression(1), pKind);
+            BinaryExpression *expr = new BinaryExpression();
+            expr->left = left;
+            expr->right = right;
+            expr->setOp(pContext->bop->getText().data());
+            if (strcmp(expr->op, ".") == 0) {
+                if(expr->right->kind == AST::AST_KIND_TERMINAL){
+                    TerminalExpression* ident = dynamic_cast<TerminalExpression *>(expr->right);
+                    if(ident->type == TerminalExpression::TYPE_IDENTIFIER){
+                        ident->type = TerminalExpression::TYPE_STRING;
+                    }
+                }
+            }
+            return expr;
+        } else if (pContext->prefix) {
+            Expression *right = visitExpression(pContext->expression(0), pKind);
+            PrefixExpression *expr = new PrefixExpression();
+            expr->expr = right;
+            expr->setOp(pContext->prefix->getText().data());
+            return expr;
+        } else if (pContext->postfix) {
+            Expression *left = visitExpression(pContext->expression(0), pKind);
+            PostfixExpression *expr = new PostfixExpression();
+            expr->expr = left;
+            expr->setOp(pContext->postfix->getText().data());
+            return expr;
+        } else if (pContext->methodCall) {
+            MethodCall *methodCall = visitMethodCall(pContext, pKind);
+            return methodCall;
+        } else if (pContext->anonymousFunction()) {
+            return visitAnonymousFunction(pContext->anonymousFunction(), pKind);
+        } else if (pContext->arrayIndexer) {
+            Expression *left = visitExpression(pContext->expression(0), pKind);
+            Expression *right = visitExpression(pContext->expression(1), pKind);
+            BinaryExpression *expr = new BinaryExpression();
+            expr->left = left;
+            expr->right = right;
+            expr->setOp(".");
+            return expr;
+        } else if (pContext->newObject()) {
+            return visitMethodCall(pContext->newObject()->expression(), pKind);
+        }
+        return nullptr;
+    }
+
+    MethodCall *visitMethodCall(zeroscriptParser::ExpressionContext *pContext, Body *pKind) {
+        MethodCall *methodCall = new MethodCall();
+        Expression *callee = visitExpression(pContext->expression(0), pKind);
+        methodCall->callee = callee;
+        methodCall->argumentsList = visitExpressionList(pContext->expressionList(), pKind);
+        return methodCall;
+    }
+
+    Expression *visitPrimaryExpression(zeroscriptParser::PrimaryExpresssionContext *pContext, Body *pKind) {
+        if (pContext->expression()) {
+            return visitExpression(pContext->expression(), pKind);
+        } else {
+            return visitAtom(pContext->atom(), pKind);
+        }
+    }
+
+    Loop *visitForLoop(zeroscriptParser::ForLoopContext *pContext, Body *parentBody) {
+        Loop *loop = new Loop();
+        size_t hasStartExpr = 0;
+        if (pContext->var()) {
+            vector<Var *> *variables = visitVar(pContext->var(), parentBody);
+            for (int i = 0; i < variables->size(); i++) {
+                Statement *stmt = new Statement();
+                stmt->stmt = variables->at(i);
+                stmt->line_number = static_cast<int>(pContext->var()->VAR()->getSymbol()->getLine());
+                parentBody->statements->push_back(stmt);
+            }
+        } else if (pContext->expression().size() > 2) {
+            hasStartExpr = 1;
+            loop->startExpr = visitExpression(pContext->expression(0), parentBody);
+        } else {
+            loop->startExpr = NULL;
+        }
+        if (pContext->bodyOrStatement()->body()) {
+            loop->body = visitBody(pContext->bodyOrStatement()->body(), parentBody);
+        } else {
+            loop->body = new Body();
+            loop->body->statements = visitStatement(pContext->bodyOrStatement()->statement(), parentBody);
+        }
+        if (pContext->expression(hasStartExpr)) {
+            loop->condition = visitExpression(pContext->expression(hasStartExpr), parentBody);
+        }
+        if (pContext->expression(hasStartExpr + 1)) {
+            loop->iterExpr = visitExpression(pContext->expression(hasStartExpr + 1), parentBody);
+        }
+        return loop;
+    }
+
+    Loop *visitWhileLoop(zeroscriptParser::WhileLoopContext *pContext, Body *pKind) {
+        return nullptr;
+    }
+
+    Conditional *visitConditional(zeroscriptParser::ConditionalContext *pContext, Body *pKind) {
+        Conditional *cond = new Conditional();
+        cond->condition = visitExpression(pContext->expression(), pKind);
+        if (pContext->bodyOrStatement(0)->body()) {
+            cond->body = visitBody(pContext->bodyOrStatement(0)->body(), pKind);
+        } else {
+            cond->body = new Body();
+            cond->body->statements = visitStatement(pContext->bodyOrStatement(0)->statement(), pKind);
+        }
+        if (pContext->ELSE()) {
+            if (pContext->bodyOrStatement(1)->body()) {
+                cond->elseBody = visitBody(pContext->bodyOrStatement(1)->body(), pKind);
+            } else {
+                cond->elseBody = new Body();
+                cond->elseBody->statements = visitStatement(pContext->bodyOrStatement(1)->statement(), pKind);
+            }
+        }
+        return cond;
+    }
+
+    AST *visitSwitchCaseConditional(zeroscriptParser::SwitchCaseContext *pContext, Body *pBody) {
+        SwitchCase *sc = new SwitchCase();
+        sc->test = visitExpression(pContext->expression(), pBody);
+        for (int i = 0; i < pContext->casePart().size(); i++) {
+            zeroscriptParser::CasePartContext *casePart = pContext->casePart(i);
+            if (casePart->body()) {
+                sc->bodies->push_back(visitBody(casePart->body(), pBody));
+            } else {
+                Body *body = new Body();
+                for (int j = 0; j < casePart->statement().size(); j++) {
+                    vector<Statement *> *stmts = visitStatement(casePart->statement(j), body);
+                    for (int k = 0; k < stmts->size(); k++) {
+                        body->statements->push_back(stmts->at(k));
+                    }
+                }
+                sc->bodies->push_back(body);
+            }
+            if (casePart->expression())
+                sc->expressions->push_back(visitExpression(casePart->expression(), pBody));
+            else
+                sc->expressions->push_back(new EmptyExpression());
+        }
+        return sc;
+    }
+
+    vector<Statement *> *visitStatement(zeroscriptParser::StatementContext *statement, Body *pKind) {
+        vector<Statement *> *resultStatements = new vector<Statement *>();
+        Statement *stmt = new Statement();
+        resultStatements->push_back(stmt);
+        if (statement->semicolon) {
+            stmt->stmt = new EmptyExpression();
+            return resultStatements;
+        }
+        if (statement->body()) {
+            stmt->stmt = visitBody(statement->body(), pKind);
+        } else if (statement->var()) {
+            vector<Var *> *variables = visitVar(statement->var(), pKind);
+            resultStatements = new vector<Statement *>();
+            for (int i = 0; i < variables->size(); i++) {
+                Statement *s = new Statement();
+                s->stmt = variables->at(i);
+                s->line_number = statement->var()->VAR()->getSymbol()->getLine();
+                resultStatements->push_back(s);
+            }
+        } else if (statement->function()) {
+            stmt->stmt = visitFunction(statement->function(), pKind);
+        } else if (statement->expression()) {
+            stmt->stmt = visitExpression(statement->expression(), pKind);
+        } else if (statement->forLoop()) {
+            stmt->stmt = visitForLoop(statement->forLoop(), pKind);
+        } else if (statement->whileLoop()) {
+            stmt->stmt = visitWhileLoop(statement->whileLoop(), pKind);
+        } else if (statement->conditional()) {
+            stmt->stmt = visitConditional(statement->conditional(), pKind);
+        } else if (statement->tryCatch()) {
+            //TODO
+        } else if (statement->throw_()) {
+            //TODO
+        } else if (statement->switchCase()) {
+            stmt->stmt = visitSwitchCaseConditional(statement->switchCase(), pKind);
+        }
+        stmt = resultStatements->at(0);
+        stmt->hasBreak = statement->BREAK() != NULL;
+        stmt->hasContinue = statement->CONTINUE() != NULL;
+        stmt->hasReturn = statement->RET() != NULL;
+        if (stmt->hasBreak || stmt->hasContinue) {
+            stmt->stmt = new EmptyExpression();
+        }
+
+        return resultStatements;
+    }
+
+    Body *visitBody(zeroscriptParser::BodyContext *context, Body *parentBody) {
+        Body *body = new Body();
+        vector<zeroscriptParser::StatementContext *> statements = context->statement();
+        for (int i = 0; i < statements.size(); i++) {
+            vector<Statement *> *resultStatements = visitStatement(statements.at(i), body);
+            for (int j = 0; j < resultStatements->size(); j++) {
+                body->statements->push_back(resultStatements->at(j));
+            }
+        }
+        return body;
+    }
+
+    void visitClassDeclaration(zeroscriptParser::ClassDeclarationContext *context) {
+        cls = new ClassDeclaration();
+        cls->body = visitBody(context->body(), NULL);
+        cls->setIdentifier(context->identifier().at(0)->getText().data());
+    }
+
+
+    ClassDeclaration *getRootClass() {
+        return cls;
+    }
+
+};
