@@ -17,6 +17,9 @@ char* obj_to_string(void* _self){
 
 static map_t *known_types_map = NULL;
 static native_fnc_t* native_strlen_wrapper = NULL;
+static native_fnc_t* native_keysize_wrapper = NULL;
+static native_fnc_t* native_keylist_wrapper = NULL;
+
 struct operations string_operations = {
         str_to_string
 };
@@ -27,6 +30,8 @@ struct operations object_operations = {
 void object_manager_init() {
     known_types_map = map_new(sizeof(z_type_info_t));
     native_strlen_wrapper = wrap_native_fnc(native_strlen);
+    native_keysize_wrapper = wrap_native_fnc(native_object_key_size);
+    native_keylist_wrapper = wrap_native_fnc(native_object_key_list);
 }
 
 void object_manager_register_object_type(char *class_name, char *bytecodes, int_t size) {
@@ -40,12 +45,19 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
 Z_INLINE z_object_t *object_new(char *class_name) {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
     obj->properties = map_new(sizeof(z_reg_t));
+    obj->key_list_cache;
     obj->ref_count = 0;
     if (class_name) {
         obj->ordinary_object.type_info = *((z_type_info_t *) map_get(known_types_map, class_name));
         z_interpreter_run(obj->ordinary_object.type_info.bytecode_stream, obj->ordinary_object.type_info.bytecode_size);
     }
     obj->operations = object_operations;
+    z_reg_t temp;
+    temp.type = TYPE_NATIVE_FUNC;
+    temp.val = (int_t) native_keysize_wrapper;
+    map_insert_non_enumerable(obj->properties, "size", &temp);
+    temp.val = (int_t) native_keylist_wrapper;
+    map_insert_non_enumerable(obj->properties, "keys", &temp);
     return obj;
 }
 
@@ -70,10 +82,10 @@ Z_INLINE z_object_t *string_new(char *data) {
     obj->string_object.value = data;
     obj->operations = string_operations;
     obj->properties = map_new(sizeof(z_reg_t));
-    z_reg_t length;
-    length.type = TYPE_NATIVE_FUNC;
-    length.val = (int_t) native_strlen_wrapper;
-    map_insert(obj->properties, "length", &length);
+    z_reg_t temp;
+    temp.type = TYPE_NATIVE_FUNC;
+    temp.val = (int_t) native_strlen_wrapper;
+    map_insert_non_enumerable(obj->properties, "length", &temp);
     return obj;
 }
 

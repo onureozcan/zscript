@@ -19,6 +19,7 @@ struct operations {
 typedef struct z_object {
     int_t ref_count;
     map_t *properties;
+    void* key_list_cache;
     union {
         struct {
             struct z_type_info_t type_info;
@@ -43,5 +44,6 @@ typedef struct z_object {
     struct operations operations;
 } z_object_t;
 Z_INLINE z_object_t *object_new(char *class_name);
+Z_INLINE z_object_t *string_new(char *data);
 
 #endif //ZEROSCRIPT_OBJECT_H

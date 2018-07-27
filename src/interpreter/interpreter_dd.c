@@ -519,8 +519,10 @@ OP_SET_FIELD :
         INIT_R2;
         if (r0->type != TYPE_NUMBER) {
             if (r0->type != TYPE_INSTANCE) {
-                z_object_t *object_to_search_on = (z_object_t *) r0->val;
+                object_to_search_on = (z_object_t *) r0->val;
                 map_insert(object_to_search_on->properties, field_name_to_get, r2);
+                //we changed a property and the cache is now garbage.
+                object_to_search_on->key_list_cache = NULL;
             } else {
                 //set field by using symbol table of this instance
             }

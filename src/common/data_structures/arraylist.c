@@ -3,8 +3,8 @@
 #define ARRAY_LIST_INITIAL_CAPACITY 3
 
 typedef struct arraylist_t {
-    uint_fast64_t size;
-    uint_fast64_t capacity;
+    int_t size;
+    int_t capacity;
     char *data;
     char *top;
     size_t size_of_item;
@@ -35,7 +35,7 @@ arraylist_t *arraylist_new(size_t sizeof_item) {
  * @param item ptr of item to be added.
  * @return size of the list.
  */
-Z_INLINE uint_fast64_t arraylist_push(arraylist_t *self, any_ptr_t item) {
+Z_INLINE int_t arraylist_push(arraylist_t *self, any_ptr_t item) {
     if (self->size >= self->capacity) {
         extend_capacity(self);
     }
@@ -51,7 +51,7 @@ Z_INLINE uint_fast64_t arraylist_push(arraylist_t *self, any_ptr_t item) {
  * @param item ptr of item to be added.
  * @param index the index.
  */
-void arraylist_set(arraylist_t *self, any_ptr_t item, uint_fast64_t index) {
+void arraylist_set(arraylist_t *self, any_ptr_t item, int_t index) {
     if (self->size >= self->capacity) {
         extend_capacity(self);
     }
@@ -67,7 +67,7 @@ Z_INLINE any_ptr_t arraylist_pop(arraylist_t *self) {
     return self->top;
 }
 
-Z_INLINE any_ptr_t arraylist_get(arraylist_t *self, uint_fast64_t index) {
+Z_INLINE any_ptr_t arraylist_get(arraylist_t *self, int_t index) {
     return (any_ptr_t) (self->data + index * self->size_of_item);
 }
 //private functions
