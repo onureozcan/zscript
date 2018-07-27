@@ -3,8 +3,8 @@
 //
 
 #define TYPE_NUMBER 0
-#define TYPE_STR 2
-#define TYPE_FUNCTION_REF 8
+#define TYPE_STR 1
+#define TYPE_FUNCTION_REF 4
 #define TYPE_OBJ 16
 #define TYPE_NATIVE_FUNC 32
 #define TYPE_INSTANCE 64
@@ -38,10 +38,10 @@ Z_INLINE static char *strconcat(const char *s1, const char *s2);
 
 void z_interpreter_run(char *byte_stream, int_t fsize);
 
-#include "object.c";
 
-#include "native_functions.c"
 #include "object.h"
+#include "native_functions.c"
+#include "object.c";
 
 Z_INLINE char *num_to_str(
 #ifdef FLOAT_SUPPORT
@@ -82,6 +82,8 @@ void z_interpreter_run(char *byte_stream, int_t fsize) {
     }
 
     char *field_name_to_get;
+
+    z_object_t *object_to_search_on = NULL;
 
     z_reg_t stack_file[stack_file_size];
 
@@ -488,7 +490,7 @@ OP_GET_FIELD_IMMEDIATE :
             INIT_R0;
             INIT_R2;
             if (r0->type != TYPE_NUMBER) {
-                z_object_t *object_to_search_on = (z_object_t *) r0->val;
+                object_to_search_on = (z_object_t *) r0->val;
                 if (r0->type != TYPE_INSTANCE) {
                     z_reg_t *prop = (z_reg_t *) map_get(object_to_search_on->properties,
                                                         field_name_to_get);
@@ -532,7 +534,7 @@ OP_CALL :
             //call native function
             native_fnc_t *native_fnc = (native_fnc_t *) r0->val;
             INIT_R1;
-            stack_ptr = native_fnc->fnc(stack_ptr, r1);
+            stack_ptr = native_fnc->fnc(stack_ptr, r1, object_to_search_on);
         } else if (r0->type == TYPE_FUNCTION_REF) {
             z_object_t *function_ref = (z_object_t *) r0->val;
             z_object_t *called_fnc = context_new();

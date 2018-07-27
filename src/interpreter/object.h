@@ -42,6 +42,6 @@ typedef struct z_object {
     };
     struct operations operations;
 } z_object_t;
-
+Z_INLINE z_object_t *object_new(char *class_name);
 
 #endif //ZEROSCRIPT_OBJECT_H

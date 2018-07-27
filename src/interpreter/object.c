@@ -16,6 +16,7 @@ char* obj_to_string(void* _self){
 }
 
 static map_t *known_types_map = NULL;
+static native_fnc_t* native_strlen_wrapper = NULL;
 struct operations string_operations = {
         str_to_string
 };
@@ -25,6 +26,7 @@ struct operations object_operations = {
 
 void object_manager_init() {
     known_types_map = map_new(sizeof(z_type_info_t));
+    native_strlen_wrapper = wrap_native_fnc(native_strlen);
 }
 
 void object_manager_register_object_type(char *class_name, char *bytecodes, int_t size) {
@@ -69,8 +71,8 @@ Z_INLINE z_object_t *string_new(char *data) {
     obj->operations = string_operations;
     obj->properties = map_new(sizeof(z_reg_t));
     z_reg_t length;
-    length.type = TYPE_NUMBER;
-    length.number_val = strlen(data);
+    length.type = TYPE_NATIVE_FUNC;
+    length.val = (int_t) native_strlen_wrapper;
     map_insert(obj->properties, "length", &length);
     return obj;
 }

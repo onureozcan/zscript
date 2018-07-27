@@ -42,7 +42,7 @@ int main(int argc, const char *argv[]) {
     Compiler *compiler = new Compiler(cls);
     long len = 0;
     char *bytes = compiler->toBytes(&len);
-
+    object_manager_init();
     if (runMode) {
         clock_t begin = clock();
         z_interpreter_run(bytes, len);
