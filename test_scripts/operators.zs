@@ -20,12 +20,18 @@ class Operators() {
         print("keys[" + i + "] is :" + testObj.keys()[i]+" and the value is :" + testObj[testObj.keys()[i]]);
     }
 
-    testObj["a new property"] = "a new value. this must invalidate key cache";
+    testObj["-------------"] = "a new value. this must invalidate key cache";
 
     print("a new value is added...");
 
     for(var i = 0; i < testObj.keys().size();i++){
         print("keys[" + i + "] is :" + testObj.keys()[i]);
+    }
+
+    print("traversing values in a foreach loop...");
+
+    for(var key in testObj){
+        print(key + " = " + testObj[key]);
     }
 
     print("prefix and postfix operators test:");

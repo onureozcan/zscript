@@ -173,7 +173,88 @@ public:
             return visitAtom(pContext->atom(), pKind);
         }
     }
+    int forIndexerCount = 0;
+    //for in loop is a syntactic sugar
+    //we convert it into a for loop
+    Loop *visitForInLoop(zeroscriptParser::ForInLoopContext *pContext, Body *parentBody) {
+        Loop *loop = new Loop();
+        Var *iterItem = new Var();
+        iterItem->setIdentifier(pContext->iterElement->getText().data());
+        iterItem->value = TerminalExpression::number("0");
+        Statement* stmt = new Statement();
+        stmt->stmt = iterItem;
+        parentBody->statements->push_back(stmt);
+        Var *indexer = new Var();
+        indexer->value = TerminalExpression::number("0");
+        char indexerName[100];
+        snprintf(indexerName,99,"$indexer%d",forIndexerCount++);
+        indexer->setIdentifier(indexerName);
+        Statement* stmt2 = new Statement();
+        stmt2->stmt = indexer;
+        parentBody->statements->push_back(stmt2);
+        //objectToIterate = iter
+        Expression *objectToIterate = visitExpression(pContext->expression(),parentBody);
+        MethodCall* objectKeysCall = new MethodCall();
+        objectKeysCall->argumentsList = new ExpressionList();
+        //objectKeys = iter.keys
+        BinaryExpression* objectKeys = new BinaryExpression();
+        objectKeys->left = objectToIterate;
+        objectKeys->right = TerminalExpression::string(" keys ");
+        objectKeys->setOp(".");
+        //objectKeysCall = iter.keys()
+        objectKeysCall->callee = objectKeys;
+        //objectKeysSize = iter.size
+        BinaryExpression* objectKeysSize = new BinaryExpression();
+        objectKeysSize->left = objectToIterate;
+        objectKeysSize->right = TerminalExpression::string(" size ");
+        objectKeysSize->setOp(".");
+        //objectKeysSizeCall = iter.size()
+        MethodCall* objectKeysSizeCall = new MethodCall();
+        objectKeysSizeCall->argumentsList = new ExpressionList();
+        objectKeysSizeCall->callee = objectKeysSize;
 
+        //condition = iter.size() > i
+        BinaryExpression *condition = new BinaryExpression();
+        condition->left = objectKeysSizeCall;
+        condition->right = TerminalExpression::identifier(indexerName);
+        condition->setOp(">");
+
+        loop->condition = condition;
+        loop->startExpr = NULL;
+
+        PostfixExpression* iter = new PostfixExpression();
+        iter->expr = TerminalExpression::identifier(indexerName);
+        iter->setOp("++");
+
+        loop->iterExpr = iter;
+
+
+        if (pContext->bodyOrStatement()->body()) {
+            loop->body = visitBody(pContext->bodyOrStatement()->body(), parentBody);
+        } else {
+            loop->body = new Body();
+            loop->body->statements = visitStatement(pContext->bodyOrStatement()->statement(), parentBody);
+        }
+
+        Statement* elemAccessStmt = new Statement();
+        loop->body->statements->insert(loop->body->statements->begin(),elemAccessStmt);
+
+        //elemAccessExpression => iterElement = objectKeysCall[indexer]
+        BinaryExpression *elemAccessExpression = new BinaryExpression();
+        elemAccessExpression->setOp("=");
+        elemAccessExpression->left = TerminalExpression::identifier(pContext->iterElement->getText().data());
+
+        //objectKeysCall[indexer]
+        BinaryExpression* keyExpr = new BinaryExpression();
+        keyExpr->setOp(".");
+        keyExpr->left = objectKeysCall;
+        keyExpr->right = TerminalExpression::identifier(indexerName);
+
+        elemAccessExpression->right = keyExpr;
+
+        elemAccessStmt->stmt = elemAccessExpression;
+        return loop;
+    }
     Loop *visitForLoop(zeroscriptParser::ForLoopContext *pContext, Body *parentBody) {
         Loop *loop = new Loop();
         size_t hasStartExpr = 0;
@@ -280,6 +361,8 @@ public:
             stmt->stmt = visitExpression(statement->expression(), pKind);
         } else if (statement->forLoop()) {
             stmt->stmt = visitForLoop(statement->forLoop(), pKind);
+        } else if (statement->forInLoop()) {
+            stmt->stmt = visitForInLoop(statement->forInLoop(), pKind);
         } else if (statement->whileLoop()) {
             stmt->stmt = visitWhileLoop(statement->whileLoop(), pKind);
         } else if (statement->conditional()) {

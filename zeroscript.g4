@@ -44,6 +44,7 @@ statement :
     | expression ';'
     | forLoop
     | whileLoop
+    | forInLoop
     | conditional
     | switchCase
     | tryCatch
@@ -91,6 +92,10 @@ variableDeclarationPart:
 
 forLoop:
     FOR '(' (expression|var)? ';' expression? ';' expression? ')' bodyOrStatement
+    ;
+
+forInLoop:
+    FOR '(' VAR iterElement = IDENT? IN expression ')' bodyOrStatement
     ;
 
 whileLoop:
@@ -178,6 +183,7 @@ THROW              : 'throw' ;
 TRY                : 'try';
 CATCH              : 'catch';
 SWITCH             : 'switch';
+IN                 : 'in';
 CASE               : 'case';
 DEFAULT            : 'default';
 

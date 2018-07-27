@@ -34,7 +34,14 @@ public:
     }
 
     z_instruction_t *getLatestInstruction() {
-        return latestInstruction;
+        for(int_t i = this->instructions->size-1;i>-1;i--){
+            latestInstruction = static_cast<z_instruction_t *>(arraylist_get(this->instructions,
+                                                                             i));
+            if (latestInstruction->opcode != COMMENT && latestInstruction->opcode != LABEL) {
+                return latestInstruction;
+            }
+        }
+        return NULL;
     }
 
     uint_t addInstruction(uint_t opcode, uint_t r0, uint_t r1, uint_t r2) {
@@ -80,10 +87,6 @@ public:
     ret:;
         uint_t retVal = (arraylist_push(this->instructions,
                                         instruction_new(opcode, (uint_t) r0, (uint_t) r1, (uint_t) r2)));
-        if (opcode != COMMENT && opcode != LABEL) {
-            latestInstruction = static_cast<z_instruction_t *>(arraylist_get(this->instructions,
-                                                                             this->instructions->size - 1));
-        }
         return retVal;
     }
 
