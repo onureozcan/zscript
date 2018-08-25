@@ -377,25 +377,29 @@ public:
         zeroscriptParser::ExpressionContext *keyContext = pair->key;
         Expression *key = visitExpression(keyContext, pBody);
         Expression *value = visitExpression(pair->expression(1), pBody);
-        //we will build the following template
+        doHandleJsonPair(nameOfTheTempObj, pBody, key, value);
+
+    }
+
+    void doHandleJsonPair(const char *nameOfTheTempObj, const Body *pBody, Expression *key,
+                          Expression *value) const {//we will build the following template
         //{nameOfTheTempObj}[key] = value;
-        BinaryExpression* keyAddressOpereation = new BinaryExpression();
+        BinaryExpression *keyAddressOpereation = new BinaryExpression();
         keyAddressOpereation->setOp(".");
         keyAddressOpereation->left = TerminalExpression::identifier(
                 nameOfTheTempObj
         );
         keyAddressOpereation->right = key;
 
-        BinaryExpression* assignmentOperation = new BinaryExpression();
+        BinaryExpression *assignmentOperation = new BinaryExpression();
         assignmentOperation->left = keyAddressOpereation;
         assignmentOperation->right = value;
         assignmentOperation->setOp("=");
 
-        Statement* stmt = new Statement();
+        Statement *stmt = new Statement();
         stmt->stmt = assignmentOperation;
 
         pBody->statements->push_back(stmt);
-
     }
 
     void visitJsonObject(zeroscriptParser::JsonObjectContext *json, char *nameOfTheTempObj, Body *pBody) {
@@ -406,7 +410,13 @@ public:
 
     }
 
-    void visitJsonArray(zeroscriptParser::JsonArrayContext *json, char *pBody, Body *pBody1) {
+    void visitJsonArray(zeroscriptParser::JsonArrayContext *json, char *nameOfTheTempObj, Body *pBody) {
+
+        for (size_t i = 0; i < json->expression().size(); i++) {
+            doHandleJsonPair(nameOfTheTempObj, pBody, TerminalExpression::string(
+                    (std::string(" ") + std::to_string(i) + std::string(" ")).data()
+            ), visitExpression(json->expression(i), pBody));
+        }
 
     }
 

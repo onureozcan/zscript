@@ -26,4 +26,12 @@ class JSONTest(){
         print(key + ":" + testObj2[key]);
     }
 
+    var arrayObj = [1,2,3,4];
+
+    print("********keys of arrayObj*******");
+
+    for(var key in arrayObj){
+        print(key + ":" + arrayObj[key]);
+    }
+
 }
