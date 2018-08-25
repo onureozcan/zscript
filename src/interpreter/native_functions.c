@@ -9,6 +9,17 @@ typedef struct native_fnc_t {
 
 map_t *native_functions = NULL;
 
+z_reg_t *native_number(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
+    z_reg_t *arg = stack--;
+    if (arg->type == TYPE_NUMBER) {
+        return_reg->number_val = arg->number_val;
+    } else {
+        return_reg->number_val = (FLOAT)(atof(((z_object_t*)arg->val)->operations.to_string((void *) arg->val)));
+    }
+    return_reg->type = TYPE_NUMBER;
+    return stack;
+}
+
 z_reg_t *native_strlen(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
     return_reg->type = TYPE_NUMBER;
     return_reg->number_val = strlen(str->operations.to_string(str));
@@ -80,4 +91,6 @@ void z_native_funcions_init() {
     map_insert(native_functions, "print", &wrapper);
     wrapper.fnc = native_object_new;
     map_insert(native_functions, "Object", &wrapper);
+    wrapper.fnc = native_number;
+    map_insert(native_functions, "number", &wrapper);
 }
