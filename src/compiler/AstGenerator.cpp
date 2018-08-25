@@ -54,7 +54,7 @@ public:
         return func;
     }
 
-    Expression *visitAtom(zeroscriptParser::AtomContext *pContext, Body *pKind) {
+    Expression *visitAtom(zeroscriptParser::AtomContext *pContext, Body *parentContext) {
         if (pContext->identifier())
             return TerminalExpression::identifier(pContext->identifier()->IDENT()->getText().data());
         if (pContext->string()) return TerminalExpression::string(pContext->string()->STRING()->getText().data());
@@ -71,6 +71,8 @@ public:
         }
         if (pContext->json()) {
             //TODO
+            zeroscriptParser::JsonContext *jsonObj = pContext->json();
+            return visitJson(jsonObj, parentContext);
         }
         return nullptr;
     }
@@ -119,9 +121,9 @@ public:
             expr->right = right;
             expr->setOp(pContext->bop->getText().data());
             if (strcmp(expr->op, ".") == 0) {
-                if(expr->right->kind == AST::AST_KIND_TERMINAL){
-                    TerminalExpression* ident = dynamic_cast<TerminalExpression *>(expr->right);
-                    if(ident->type == TerminalExpression::TYPE_IDENTIFIER){
+                if (expr->right->kind == AST::AST_KIND_TERMINAL) {
+                    TerminalExpression *ident = dynamic_cast<TerminalExpression *>(expr->right);
+                    if (ident->type == TerminalExpression::TYPE_IDENTIFIER) {
                         ident->type = TerminalExpression::TYPE_STRING;
                     }
                 }
@@ -173,7 +175,9 @@ public:
             return visitAtom(pContext->atom(), pKind);
         }
     }
+
     int forIndexerCount = 0;
+
     //for in loop is a syntactic sugar
     //we convert it into a for loop
     Loop *visitForInLoop(zeroscriptParser::ForInLoopContext *pContext, Body *parentBody) {
@@ -181,35 +185,35 @@ public:
         Var *iterItem = new Var();
         iterItem->setIdentifier(pContext->iterElement->getText().data());
         iterItem->value = TerminalExpression::number("0");
-        Statement* stmt = new Statement();
+        Statement *stmt = new Statement();
         stmt->stmt = iterItem;
         parentBody->statements->push_back(stmt);
         Var *indexer = new Var();
         indexer->value = TerminalExpression::number("0");
         char indexerName[100];
-        snprintf(indexerName,99,"$indexer%d",forIndexerCount++);
+        snprintf(indexerName, 99, "$indexer%d", forIndexerCount++);
         indexer->setIdentifier(indexerName);
-        Statement* stmt2 = new Statement();
+        Statement *stmt2 = new Statement();
         stmt2->stmt = indexer;
         parentBody->statements->push_back(stmt2);
         //objectToIterate = iter
-        Expression *objectToIterate = visitExpression(pContext->expression(),parentBody);
-        MethodCall* objectKeysCall = new MethodCall();
+        Expression *objectToIterate = visitExpression(pContext->expression(), parentBody);
+        MethodCall *objectKeysCall = new MethodCall();
         objectKeysCall->argumentsList = new ExpressionList();
         //objectKeys = iter.keys
-        BinaryExpression* objectKeys = new BinaryExpression();
+        BinaryExpression *objectKeys = new BinaryExpression();
         objectKeys->left = objectToIterate;
         objectKeys->right = TerminalExpression::string(" keys ");
         objectKeys->setOp(".");
         //objectKeysCall = iter.keys()
         objectKeysCall->callee = objectKeys;
         //objectKeysSize = iter.size
-        BinaryExpression* objectKeysSize = new BinaryExpression();
+        BinaryExpression *objectKeysSize = new BinaryExpression();
         objectKeysSize->left = objectToIterate;
         objectKeysSize->right = TerminalExpression::string(" size ");
         objectKeysSize->setOp(".");
         //objectKeysSizeCall = iter.size()
-        MethodCall* objectKeysSizeCall = new MethodCall();
+        MethodCall *objectKeysSizeCall = new MethodCall();
         objectKeysSizeCall->argumentsList = new ExpressionList();
         objectKeysSizeCall->callee = objectKeysSize;
 
@@ -222,7 +226,7 @@ public:
         loop->condition = condition;
         loop->startExpr = NULL;
 
-        PostfixExpression* iter = new PostfixExpression();
+        PostfixExpression *iter = new PostfixExpression();
         iter->expr = TerminalExpression::identifier(indexerName);
         iter->setOp("++");
 
@@ -236,8 +240,8 @@ public:
             loop->body->statements = visitStatement(pContext->bodyOrStatement()->statement(), parentBody);
         }
 
-        Statement* elemAccessStmt = new Statement();
-        loop->body->statements->insert(loop->body->statements->begin(),elemAccessStmt);
+        Statement *elemAccessStmt = new Statement();
+        loop->body->statements->insert(loop->body->statements->begin(), elemAccessStmt);
 
         //elemAccessExpression => iterElement = objectKeysCall[indexer]
         BinaryExpression *elemAccessExpression = new BinaryExpression();
@@ -245,7 +249,7 @@ public:
         elemAccessExpression->left = TerminalExpression::identifier(pContext->iterElement->getText().data());
 
         //objectKeysCall[indexer]
-        BinaryExpression* keyExpr = new BinaryExpression();
+        BinaryExpression *keyExpr = new BinaryExpression();
         keyExpr->setOp(".");
         keyExpr->left = objectKeysCall;
         keyExpr->right = TerminalExpression::identifier(indexerName);
@@ -255,6 +259,7 @@ public:
         elemAccessStmt->stmt = elemAccessExpression;
         return loop;
     }
+
     Loop *visitForLoop(zeroscriptParser::ForLoopContext *pContext, Body *parentBody) {
         Loop *loop = new Loop();
         size_t hasStartExpr = 0;
@@ -334,6 +339,75 @@ public:
                 sc->expressions->push_back(new EmptyExpression());
         }
         return sc;
+    }
+
+    int jsonObjectCount = 0;
+
+    Expression *visitJson(zeroscriptParser::JsonContext *json, Body *pBody) {
+
+        Statement *stmt = new Statement();
+        //json is a syntactic sugar.
+        //we are going to build this template.
+        //var $obj{jsonObjectCount} = new Object();
+        MethodCall *call = new MethodCall();
+        TerminalExpression *expr = TerminalExpression::identifier("Object");
+        call->callee = expr;
+        call->argumentsList = new ExpressionList();
+
+        char *nameOfTheTempObject = const_cast<char *>((std::string("$tempJson") +
+                                                        std::to_string(++jsonObjectCount)).data());
+
+        Var *var = new Var();
+        var->setIdentifier(std::string(nameOfTheTempObject).data());
+        var->value = call;
+
+        stmt->stmt = var;
+        pBody->statements->push_back(stmt);
+
+        if (json->jsonObject()) {
+            visitJsonObject(json->jsonObject(), nameOfTheTempObject, pBody);
+        } else {
+            visitJsonArray(json->jsonArray(), nameOfTheTempObject, pBody);
+        }
+
+        return TerminalExpression::identifier(nameOfTheTempObject);
+    }
+
+    void visitJsonPair(zeroscriptParser::JsonPairContext *pair, char *nameOfTheTempObj, Body *pBody) {
+        zeroscriptParser::ExpressionContext *keyContext = pair->key;
+        Expression *key = visitExpression(keyContext, pBody);
+        Expression *value = visitExpression(pair->expression(1), pBody);
+        //we will build the following template
+        //{nameOfTheTempObj}[key] = value;
+        BinaryExpression* keyAddressOpereation = new BinaryExpression();
+        keyAddressOpereation->setOp(".");
+        keyAddressOpereation->left = TerminalExpression::identifier(
+                nameOfTheTempObj
+        );
+        keyAddressOpereation->right = key;
+
+        BinaryExpression* assignmentOperation = new BinaryExpression();
+        assignmentOperation->left = keyAddressOpereation;
+        assignmentOperation->right = value;
+        assignmentOperation->setOp("=");
+
+        Statement* stmt = new Statement();
+        stmt->stmt = assignmentOperation;
+
+        pBody->statements->push_back(stmt);
+
+    }
+
+    void visitJsonObject(zeroscriptParser::JsonObjectContext *json, char *nameOfTheTempObj, Body *pBody) {
+
+        for (int i = 0; i < json->jsonPair().size(); i++) {
+            visitJsonPair(json->jsonPair(i), nameOfTheTempObj, pBody);
+        }
+
+    }
+
+    void visitJsonArray(zeroscriptParser::JsonArrayContext *json, char *pBody, Body *pBody1) {
+
     }
 
     vector<Statement *> *visitStatement(zeroscriptParser::StatementContext *statement, Body *pKind) {

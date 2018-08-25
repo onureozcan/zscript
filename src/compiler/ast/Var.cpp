@@ -22,7 +22,7 @@ public:
     }
 
     void print() override {
-        cout << "var " << identifier << " = ";
+        cout << "var `" << identifier << "` = ";
         value->print();
     }
 
