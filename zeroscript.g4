@@ -3,8 +3,8 @@ grammar zeroscript;
 expression:
        newObject
        | primaryExpresssion
-       | expression arrayIndexer = '[' expression ']'
        | expression bop ='.' expression
+       | expression arrayIndexer = '[' expression ']'
        | expression methodCall = '(' expressionList? ')'
        | expression postfix=('++' | '--')
        | prefix=('+'|'-'|'++'|'--') expression
@@ -128,7 +128,7 @@ throw_:
     ;
 
 jsonPair:
-    key = string ':' expression
+    key = expression ':' expression
     ;
 
 jsonObject:
