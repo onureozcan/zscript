@@ -98,7 +98,7 @@ arraylist_t *map_key_list(map_t *self) {
             for (int_t j = 0; j < kbag->size; j++) {
                 int_t flag = *((int *) arraylist_get(fbag, j));
                 if (flag & MAP_FLAG_ENUMERABLE)
-                    arraylist_push(keys, *((char **) arraylist_get(kbag, j)));
+                    arraylist_push(keys, &(*(char **) arraylist_get(kbag, j)));
             }
     }
     return keys;

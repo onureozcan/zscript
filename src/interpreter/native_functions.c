@@ -45,7 +45,7 @@ z_reg_t *native_object_key_list(z_reg_t *stack, z_reg_t *return_reg, z_object_t 
         ret = object_new(NULL);
         arraylist_t *keys = map_key_list(object->properties);
         for (int_t i = 0; i < keys->size; i++) {
-            char *value = (char *) arraylist_get(keys, i);
+            char *value = *(char **) arraylist_get(keys, i);
             z_reg_t value_reg;
             value_reg.val = (int_t) string_new(value);
             value_reg.type = TYPE_STR;
