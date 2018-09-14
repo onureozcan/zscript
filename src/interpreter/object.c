@@ -116,6 +116,7 @@ Z_INLINE z_object_t *function_ref_new(uint_t start_addr, void *parent_context, z
     obj->function_ref_object.start_address = start_addr;
     obj->function_ref_object.parent_context = parent_context;
     obj->function_ref_object.responsible_interpreter_state = state;
+    obj->operations = object_operations;
     return obj;
 }
 

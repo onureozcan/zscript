@@ -1,15 +1,26 @@
 class Hello(){
 
-    var hello_message = "hello world!";
+    var helloMessage = "hello world!";
 
     sayHello();
 
     function setHelloMessage(message){
-        hello_message = message;
+        helloMessage = message;
+    }
+
+    function getHelloMessage(){
+        return helloMessage;
     }
 
     function sayHello(){
-        print(hello_message);
+        print(helloMessage);
+    }
+
+    function closureTest(){
+        var x = 100;
+        return ()=>{
+            print("variable in my parent scope is :"+x);
+        };
     }
 
 }

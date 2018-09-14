@@ -55,6 +55,7 @@ typedef struct z_interpreter_state_t {
     char *byte_stream;
     int_t fsize;
     z_instruction_t *instruction_pointer;
+    z_reg_t return_value;
 } z_interpreter_state_t;
 
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state);
@@ -638,6 +639,8 @@ OP_CALL :
                                                                         function_ref->function_ref_object.start_address);
                 other_state->current_context = called_fnc;
                 z_interpreter_run(other_state);
+                INIT_R1;
+                *r1 = other_state->return_value;
                 instruction_ptr++;
             } else {
                 //our function
@@ -680,6 +683,7 @@ OP_RETURN :
         current_context->ref_count--;
         initial_state->current_context = current_context;
         current_context = (z_object_t *) current_context->context_object.return_context;
+        initial_state->return_value = *actual_return_reg;
         if (current_context == NULL) goto end;
         current_context->ref_count--;
         locals_ptr = (z_reg_t *) current_context->context_object.locals;
