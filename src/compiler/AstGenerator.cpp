@@ -316,31 +316,6 @@ public:
         return cond;
     }
 
-    AST *visitSwitchCaseConditional(zeroscriptParser::SwitchCaseContext *pContext, Body *pBody) {
-        SwitchCase *sc = new SwitchCase();
-        sc->test = visitExpression(pContext->expression(), pBody);
-        for (int i = 0; i < pContext->casePart().size(); i++) {
-            zeroscriptParser::CasePartContext *casePart = pContext->casePart(i);
-            if (casePart->body()) {
-                sc->bodies->push_back(visitBody(casePart->body(), pBody));
-            } else {
-                Body *body = new Body();
-                for (int j = 0; j < casePart->statement().size(); j++) {
-                    vector<Statement *> *stmts = visitStatement(casePart->statement(j), body);
-                    for (int k = 0; k < stmts->size(); k++) {
-                        body->statements->push_back(stmts->at(k));
-                    }
-                }
-                sc->bodies->push_back(body);
-            }
-            if (casePart->expression())
-                sc->expressions->push_back(visitExpression(casePart->expression(), pBody));
-            else
-                sc->expressions->push_back(new EmptyExpression());
-        }
-        return sc;
-    }
-
     int jsonObjectCount = 0;
 
     Expression *visitJson(zeroscriptParser::JsonContext *json, Body *pBody) {
@@ -455,8 +430,6 @@ public:
             //TODO
         } else if (statement->throw_()) {
             //TODO
-        } else if (statement->switchCase()) {
-            stmt->stmt = visitSwitchCaseConditional(statement->switchCase(), pKind);
         }
         stmt = resultStatements->at(0);
         stmt->hasBreak = statement->BREAK() != NULL;

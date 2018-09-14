@@ -46,7 +46,6 @@ statement :
     | whileLoop
     | forInLoop
     | conditional
-    | switchCase
     | tryCatch
     | throw_ ';'
     | BREAK ';'
@@ -104,15 +103,6 @@ whileLoop:
 
 conditional:
     IF '(' expression ')' bodyOrStatement (ELSE bodyOrStatement)?
-;
-
-switchCase:
-    SWITCH '(' expression ')''{'
-        casePart*
-        '}'
-;
-casePart:
-    ((CASE expression)| DEFAULT) ':' (statement+|body)
 ;
 
 classDeclaration:
