@@ -6,8 +6,15 @@ class JSONTest()
     };
 
     var testObj2 = {
-        "nested": testObj
+        "nested": testObj,
+        "123456789":0
     };
+
+    print("********keys of testObj2*******");
+
+    for (var key in testObj2) {
+        print(key + ":" + testObj2[key]);
+    }
 
     print("********keys of testObj*******");
 
@@ -19,12 +26,6 @@ class JSONTest()
 
     for (var key in testObj2.nested) {
         print(key + ":" + testObj2.nested[key]);
-    }
-
-    print("********keys of testObj2*******");
-
-    for (var key in testObj2) {
-        print(key + ":" + testObj2[key]);
     }
 
     var arrayObj = [1, 2, 3, 4];
@@ -50,6 +51,5 @@ class JSONTest()
     for (var key in arrayOfObjects) {
         arrayOfObjects[key](key);
     }
-
 
 }

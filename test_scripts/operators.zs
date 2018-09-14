@@ -20,7 +20,7 @@ class Operators() {
         print("keys[" + i + "] is :" + testObj.keys()[i]+" and the value is :" + testObj[testObj.keys()[i]]);
     }
 
-    testObj["-------------"] = "a new value. this must invalidate key cache";
+    testObj["asd"] = "a new value. this must invalidate key cache";
 
     print("a new value is added...");
 

@@ -8,8 +8,8 @@
 typedef struct z_type_info_t {
     char *class_name;
     char *bytecode_stream;
-    map_t *symbol_table;
     int_t bytecode_size;
+    void* saved_state;
 } z_type_info_t;
 
 struct operations {
@@ -23,6 +23,7 @@ typedef struct z_object {
     union {
         struct {
             struct z_type_info_t type_info;
+            z_interpreter_state_t* saved_state;
         } ordinary_object;
         struct {
             void *parent_context;
@@ -39,6 +40,7 @@ typedef struct z_object {
         struct {
             uint_t start_address;
             void *parent_context;
+            z_interpreter_state_t *responsible_interpreter_state;
         } function_ref_object;
     };
     struct operations operations;

@@ -8,16 +8,30 @@
 #define TYPE_OBJ 16
 #define TYPE_NATIVE_FUNC 32
 #define TYPE_INSTANCE 64
+#define TYPE_CONSTRUCTOR_REF 128
+
+//#define PRE_CALCULATE_JUMP_POINTERS
 
 #define INIT_R0 z_reg_t* r0 = locals_ptr + instruction_ptr->r0
 #define INIT_R1 z_reg_t* r1 = locals_ptr + instruction_ptr->r1
 #define INIT_R2 z_reg_t* r2 = locals_ptr + instruction_ptr->r2
+
+#ifndef PRE_CALCULATE_JUMP_POINTERS
+
+#define GOTO_NEXT goto *dispatch_table[(++instruction_ptr)->opcode];
+#define GOTO_CURRENT goto *dispatch_table[(instruction_ptr)->opcode];
+
+#else
+
 #define GOTO_NEXT goto *(++instruction_ptr)->opcode;
 #define GOTO_CURRENT goto *(instruction_ptr)->opcode;
+
+#endif
 
 #ifdef FLOAT_SUPPORT
 #else
 #endif
+
 
 typedef struct z_reg_t {
     int_t type;
@@ -31,13 +45,35 @@ typedef struct z_reg_t {
     };
 } z_reg_t;
 
-
 char *num_to_str(FLOAT val);
 
 Z_INLINE static char *strconcat(const char *s1, const char *s2);
 
-void z_interpreter_run(char *byte_stream, int_t fsize);
 
+typedef struct z_interpreter_state_t {
+    void *current_context;
+    char *byte_stream;
+    int_t fsize;
+    z_instruction_t* instruction_pointer;
+} z_interpreter_state_t;
+
+z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state);
+
+/**
+ * get a field of an object.
+ * @param saved_state saved state of the object.
+ * @param field_name_to_get self explanatory.
+ * @return register type.
+ */
+z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_get);
+
+/**
+ * set a field of an object.
+ * @param saved_state saved state of the object.
+ * @param field_name_to_set self explanatory.
+ * @param value value of the field.
+ */
+void interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_set, z_reg_t *value);
 
 #include "object.h"
 #include "native_functions.c"
@@ -73,9 +109,23 @@ Z_INLINE static char *strconcat(const char *s1, const char *s2) {
     return buff;
 }
 
-const int stack_file_size = 1000;
+#define stack_file_size 1000
+z_reg_t stack_file[stack_file_size];
 
-void z_interpreter_run(char *byte_stream, int_t fsize) {
+z_reg_t *stack_ptr = stack_file;
+
+z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
+
+    char *byte_stream = initial_state->byte_stream;
+    int_t fsize = initial_state->fsize;
+
+    z_object_t *current_context = (z_object_t *) initial_state->current_context;
+
+    if (initial_state->current_context == NULL) {
+        current_context = context_new();
+        current_context->context_object.parent_context = NULL;
+        current_context->context_object.return_context = NULL;
+    }
 
     if (!native_functions) {
         z_native_funcions_init();
@@ -85,15 +135,9 @@ void z_interpreter_run(char *byte_stream, int_t fsize) {
 
     z_object_t *object_to_search_on = NULL;
 
-    z_reg_t stack_file[stack_file_size];
-
-    z_object_t *current_context = context_new();
-    current_context->context_object.parent_context = NULL;
-    current_context->context_object.return_context = NULL;
     current_context->ref_count++;
 
     z_reg_t *locals_ptr = NULL;
-    z_reg_t *stack_ptr = stack_file;
     z_instruction_t *instruction_ptr;
 
     uint_t code_start = ((uint_t *) byte_stream)[0];
@@ -140,14 +184,20 @@ void z_interpreter_run(char *byte_stream, int_t fsize) {
     };
     fsize -= code_start;
     //initialize jump properties
+#ifdef PRE_CALCULATE_JUMP_POINTERS
     for (long i = 0; i < fsize; i += sizeof(z_instruction_t)) {
         instruction_ptr = (z_instruction_t *) (code + i);
         //printf("%s %d, %d, %d \n", name_opcode(instruction_ptr->opcode), instruction_ptr->r0, instruction_ptr->r1, instruction_ptr->r2);
         instruction_ptr->opcode = (uint_t) dispatch_table[(instruction_ptr)->opcode];
     }
+#endif
     //exit(0);
     //reset current instruction
-    instruction_ptr = (z_instruction_t *) code;
+    if (initial_state->instruction_pointer == NULL) {
+        instruction_ptr = (z_instruction_t *) code;
+    } else {
+        instruction_ptr = initial_state->instruction_pointer;
+    }
     GOTO_CURRENT;
 OP_MOV_NUMBER:
     {
@@ -159,7 +209,7 @@ OP_MOV_NUMBER:
 OP_MOV_FNC:
     {
         INIT_R0;
-        r0->val = (int_t) function_ref_new(instruction_ptr->r1, current_context);
+        r0->val = (int_t) function_ref_new(instruction_ptr->r1, current_context, initial_state);
         r0->type = TYPE_FUNCTION_REF;
         GOTO_NEXT;
     };
@@ -208,7 +258,6 @@ OP_ADD :
         INIT_R0;
         INIT_R1;
         INIT_R2;
-
         if (r0->type == TYPE_NUMBER) {
             if (r1->type == TYPE_NUMBER) {
                 r2->number_val = ((r0->number_val) + (r1->number_val));
@@ -456,7 +505,7 @@ OP_GET_FIELD:
 OP_GET_FIELD_IMMEDIATE :
     {
         field_name_to_get = data + instruction_ptr->r1;
-    fieldNameSet:
+    fieldNameSet:;
         uint_t lookup_object = instruction_ptr->r0;
         //first search native functions
         native_fnc_t *native_fnc = (native_fnc_t *) map_get(native_functions, field_name_to_get);
@@ -481,10 +530,14 @@ OP_GET_FIELD_IMMEDIATE :
                 if (index_ptr) {
                     int_t index = *index_ptr;
                     *r2 = *(((z_reg_t *) context->context_object.locals) + index);
-                    break;
+                    //found!
+                    GOTO_NEXT;
                 }
                 context = (z_object_t *) context->context_object.parent_context;
             }
+            //not found, maybe a class constructor?
+            r2->type = TYPE_CONSTRUCTOR_REF;
+            r2->val = (int_t) field_name_to_get;
         } else {
             //access r0 and search upon it
             INIT_R0;
@@ -500,7 +553,15 @@ OP_GET_FIELD_IMMEDIATE :
                         error_and_exit("cannot read property");
                     }
                 } else {
-                    //search by symbol table
+                    //get field from an object instance
+                    object_to_search_on = (z_object_t *) r0->val;
+                    z_interpreter_state_t *state = object_to_search_on->ordinary_object.saved_state;
+                    z_reg_t *prop = interpreter_get_field_virtual(state, field_name_to_get);
+                    if (prop) {
+                        *r2 = *prop;
+                    } else {
+                        error_and_exit("cannot read property");
+                    }
                 }
             }
         }
@@ -525,6 +586,9 @@ OP_SET_FIELD :
                 object_to_search_on->key_list_cache = NULL;
             } else {
                 //set field by using symbol table of this instance
+                object_to_search_on = (z_object_t *) r0->val;
+                z_interpreter_state_t *state = object_to_search_on->ordinary_object.saved_state;
+                interpreter_set_field_virtual(state, field_name_to_get, r2);
             }
         }
         GOTO_NEXT;
@@ -539,19 +603,38 @@ OP_CALL :
             stack_ptr = native_fnc->fnc(stack_ptr, r1, object_to_search_on);
         } else if (r0->type == TYPE_FUNCTION_REF) {
             z_object_t *function_ref = (z_object_t *) r0->val;
-            z_object_t *called_fnc = context_new();
-            called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
-            called_fnc->context_object.return_context = current_context;
-            called_fnc->context_object.return_address = instruction_ptr;
-            called_fnc->context_object.requested_return_register_index = instruction_ptr->r1;
-            instruction_ptr = (z_instruction_t *) (byte_stream + function_ref->function_ref_object.start_address);
-            current_context->ref_count++;
-            current_context = called_fnc;
+            //someone else's function...
+            if (function_ref->function_ref_object.responsible_interpreter_state != initial_state) {
+                z_interpreter_state_t* other_state = function_ref->function_ref_object.responsible_interpreter_state;
+                z_object_t *called_fnc = context_new();
+                called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
+                called_fnc->context_object.return_context = NULL;
+                called_fnc->context_object.return_address = NULL;
+                called_fnc->context_object.requested_return_register_index = instruction_ptr->r1;
+                other_state->instruction_pointer = (z_instruction_t *) (other_state->byte_stream + function_ref->function_ref_object.start_address);
+                other_state->current_context = called_fnc;
+                z_interpreter_run(other_state);
+                instruction_ptr++;
+            } else {
+                //our function
+                z_object_t *called_fnc = context_new();
+                called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
+                called_fnc->context_object.return_context = current_context;
+                called_fnc->context_object.return_address = instruction_ptr;
+                called_fnc->context_object.requested_return_register_index = instruction_ptr->r1;
+                instruction_ptr = (z_instruction_t *) (byte_stream + function_ref->function_ref_object.start_address);
+                current_context->ref_count++;
+                current_context = called_fnc;
+            }
             GOTO_CURRENT;
+        } else if (r0->type == TYPE_CONSTRUCTOR_REF) {
+            INIT_R1;
+            r1->type = TYPE_INSTANCE;
+            r1->val = (int_t) object_new((char *) r0->val);
         } else {
             error_and_exit("callee is not a function");
         }
-        GOTO_NEXT
+        GOTO_NEXT;
     };
 OP_PUSH:
     {
@@ -571,6 +654,7 @@ OP_RETURN :
         instruction_ptr = current_context->context_object.return_address;
         uint_t return_reg = current_context->context_object.requested_return_register_index;
         current_context->ref_count--;
+        initial_state->current_context = current_context;
         current_context = (z_object_t *) current_context->context_object.return_context;
         if (current_context == NULL) goto end;
         current_context->ref_count--;
@@ -598,8 +682,60 @@ OP_FFRAME :
         GOTO_NEXT;
     }
 end:
-    printf("\n");
-    return;
+    return initial_state;
+}
+
+/**
+ * get a field of an object.
+ * @param saved_state saved state of the object.
+ * @param field_name_to_get self explanatory.
+ * @return register type.
+ */
+z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_get) {
+    z_object_t *context = (z_object_t *) saved_state->current_context;
+    while (context != NULL) {
+        map_t *symbol_table = context->context_object.symbol_table;
+        if (!symbol_table) {
+            //build symbol table
+            symbol_table = build_symbol_table(
+                    saved_state->byte_stream + context->context_object.symbols_address
+            );
+            context->context_object.symbol_table = symbol_table;
+        }
+        int_t *index_ptr = ((int_t *) map_get(symbol_table, field_name_to_get));
+        if (index_ptr) {
+            int_t index = *index_ptr;
+            return (((z_reg_t *) context->context_object.locals) + index);
+            //found!
+        }
+        context = (z_object_t *) context->context_object.parent_context;
+    }
+    return NULL;
+}
+
+/**
+ * set a field of an object.
+ * @param saved_state saved state of the object.
+ * @param field_name_to_set self explanatory.
+ * @param value value of the field.
+ */
+void interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_set, z_reg_t *value) {
+    z_object_t *context = (z_object_t *) saved_state->current_context;
+    map_t *symbol_table = context->context_object.symbol_table;
+    if (!symbol_table) {
+        //build symbol table
+        symbol_table = build_symbol_table(
+                saved_state->byte_stream + context->context_object.symbols_address
+        );
+        context->context_object.symbol_table = symbol_table;
+    }
+    int_t *index_ptr = ((int_t *) map_get(symbol_table, field_name_to_set));
+    if (index_ptr) {
+        int_t index = *index_ptr;
+        *(((z_reg_t *) context->context_object.locals) + index) = *value;
+    } else {
+        error_and_exit("no such property found ond object");
+    }
 }
 
 

@@ -5,7 +5,7 @@
 #ifndef ZEROSCRIPT_COMMON_H
 #define ZEROSCRIPT_COMMON_H
 
-#define Z_INLINE inline
+#define Z_INLINE
 #define Z_MALLOC malloc
 #define Z_REALLOC realloc
 #define Z_FREE free

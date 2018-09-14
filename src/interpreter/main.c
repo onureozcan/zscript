@@ -7,6 +7,7 @@
 #include "../program/instruction.h"
 
 #define USE_DIRECT_THREADING
+#define NO_DYNAMIC_COMPILATION
 
 #ifdef USE_DIRECT_THREADING
 #include "interpreter_dd.c"
@@ -27,7 +28,7 @@ int main(int argc, const char *argv[]) {
     fclose(f);
     clock_t begin = clock();
 
-    object_manager_init();
+    object_manager_init("");
     object_manager_register_object_type((char *) filename, bytes, fsize);
     object_new((char *) filename);
 

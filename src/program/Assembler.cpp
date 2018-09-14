@@ -134,7 +134,7 @@ class Assembler {
     }
 
 public:
-    char *toBytes(Program *z_program, long *len) {
+    char *toBytes(Program *z_program, size_t *len) {
         assemble(z_program);
         *len = pos;
         return bytes;

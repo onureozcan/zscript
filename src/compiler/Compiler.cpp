@@ -25,18 +25,18 @@ class Compiler {
         return functionsStack->top()->symbolTable;
     };
     char *bytes = NULL;
-    long len = 0;
+    size_t len = 0;
 public :
     Compiler(ClassDeclaration *ast) {
         AddressCalculator *addressCalculator = new AddressCalculator(ast);
         compileClass((ast));
-        program->print();
+        //program->print();
         Assembler assembler;
         bytes = assembler.toBytes(program, &len);
-        ast->print();
+        //ast->print();
     }
 
-    char *toBytes(long *len) {
+    char *toBytes(size_t *len) {
         *len = this->len;
         return bytes;
     }

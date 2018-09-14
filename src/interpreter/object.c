@@ -11,14 +11,16 @@ Z_INLINE z_object_t *string_new(char *data);
 
 #include "types/string.h"
 
-char* obj_to_string(void* _self){
+char* class_path = 0;
+
+char *obj_to_string(void *_self) {
     return "[object]";
 }
 
 static map_t *known_types_map = NULL;
-static native_fnc_t* native_strlen_wrapper = NULL;
-static native_fnc_t* native_keysize_wrapper = NULL;
-static native_fnc_t* native_keylist_wrapper = NULL;
+static native_fnc_t *native_strlen_wrapper = NULL;
+static native_fnc_t *native_keysize_wrapper = NULL;
+static native_fnc_t *native_keylist_wrapper = NULL;
 
 struct operations string_operations = {
         str_to_string
@@ -27,7 +29,8 @@ struct operations object_operations = {
         obj_to_string
 };
 
-void object_manager_init() {
+void object_manager_init(char* cp) {
+    class_path = cp;
     known_types_map = map_new(sizeof(z_type_info_t));
     native_strlen_wrapper = wrap_native_fnc(native_strlen);
     native_keysize_wrapper = wrap_native_fnc(native_object_key_size);
@@ -48,8 +51,47 @@ Z_INLINE z_object_t *object_new(char *class_name) {
     obj->key_list_cache;
     obj->ref_count = 0;
     if (class_name) {
-        obj->ordinary_object.type_info = *((z_type_info_t *) map_get(known_types_map, class_name));
-        z_interpreter_run(obj->ordinary_object.type_info.bytecode_stream, obj->ordinary_object.type_info.bytecode_size);
+        z_type_info_t *object_type_info = (z_type_info_t *) map_get(known_types_map, class_name);
+        char *bytes = 0;
+        size_t fsize;
+        if (object_type_info == NULL) {
+            //search on classpath and load
+            char *file_to_load = (char *) z_alloc_or_die(strlen(class_name) + strlen(class_path) + 5);
+            sprintf(file_to_load, "%s/%s.zcl", class_path, class_name);
+            FILE *f = fopen(file_to_load, "rb");
+            if (f == NULL) {
+#ifndef NO_DYNAMIC_COMPILATION
+                //may be not compiled yet?
+                sprintf(file_to_load, "%s/%s.zs", class_path, class_name);
+                f = fopen(file_to_load, "rb");
+                if (f == NULL) {
+                    error_and_exit("cannot find class");
+                } else {
+                    fclose(f);
+                    bytes = compile_file(file_to_load,&fsize);
+                }
+#else
+                error_and_exit("cannot find class");
+#endif
+            } else {
+                fseek(f, 0, SEEK_END);
+                fsize = (size_t) ftell(f);
+                fseek(f, 0, SEEK_SET);
+                bytes = (char *) z_alloc_or_die(fsize + 1);
+                fread(bytes, fsize, 1, f);
+                fclose(f);
+            }
+            object_manager_register_object_type(class_name, bytes, fsize);
+            object_type_info = (z_type_info_t *) map_get(known_types_map, class_name);
+        }
+        obj->ordinary_object.type_info = *object_type_info;
+        z_interpreter_state_t* initial_state = (z_interpreter_state_t*) z_alloc_or_die(sizeof(z_interpreter_state_t));
+        initial_state->fsize = obj->ordinary_object.type_info.bytecode_size;
+        initial_state->byte_stream = obj->ordinary_object.type_info.bytecode_stream;
+        initial_state->current_context = NULL;
+        initial_state->instruction_pointer = NULL;
+        obj->ordinary_object.saved_state  = z_interpreter_run(initial_state);
+        return obj;
     }
     obj->operations = object_operations;
     z_reg_t temp;
@@ -68,11 +110,12 @@ Z_INLINE z_object_t *context_new() {
     return obj;
 }
 
-Z_INLINE z_object_t *function_ref_new(uint_t start_addr, void *parent_context) {
+Z_INLINE z_object_t *function_ref_new(uint_t start_addr, void *parent_context, z_interpreter_state_t* state) {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
     obj->ref_count = 0;
     obj->function_ref_object.start_address = start_addr;
     obj->function_ref_object.parent_context = parent_context;
+    obj->function_ref_object.responsible_interpreter_state = state;
     return obj;
 }
 
