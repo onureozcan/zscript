@@ -143,14 +143,36 @@ public:
                 error_and_exit(const_cast<char *>("left value expected"));
             }
         }
+        // if we are setting a variable from a parent scope...
+        if (isAssignment && pExpression->left->kind == AST::AST_KIND_TERMINAL) {
+            TerminalExpression *leftValue = (TerminalExpression *) (pExpression->left);
+            if (leftValue->type == TerminalExpression::TYPE_IDENTIFIER) {
+                char *ident = leftValue->data;
+                int_t is_left_variable_on_scope = getRegister(ident) != NULL;
+                if (!is_left_variable_on_scope) {
+                    leftReg = getRegister(NULL);
+                    program->addInstruction(MOV_STR, (uint_t) leftReg,
+                                            (uint_t) (ident), (uint_t) 0);
+                    rightReg = compileExpression(pExpression->right);
+                    //setfield this, $leftReg, $resutReg
+                    program->addInstruction(SET_FIELD, (uint_t) (1),
+                                            (uint_t) (leftReg), (uint_t) (rightReg));
+                    //result of this operation is null
+                    return (uint_t)0;
+                }
+            } else {
+                error_and_exit(const_cast<char *>("left value expected"));
+            }
+        }
+
         leftReg = compileExpression(pExpression->left);
         int_t requestedDestinationRegister = -1;
         if (isAssignment) {
             requestedDestinationRegister = leftReg;
         }
-        if(isDot) rightReg = compileExpression(pExpression->right, requestedDestinationRegister, 1);
+        if (isDot) rightReg = compileExpression(pExpression->right, requestedDestinationRegister, 1);
         else
-        rightReg = compileExpression(pExpression->right, requestedDestinationRegister);
+            rightReg = compileExpression(pExpression->right, requestedDestinationRegister);
         if (destinationRegister != -1) {
             resultReg = destinationRegister;
         } else {
@@ -169,7 +191,7 @@ public:
 
     int_t compileTerminal(TerminalExpression *right, int_t destionationRegister = -1, int_t has_lookup_object = 0) {
         if (right->type == TerminalExpression::TYPE_IDENTIFIER) {
-            if(has_lookup_object) compileIdentifier(right->data);
+            if (has_lookup_object) compileIdentifier(right->data);
             return compileIdentifierImmediate(right->data);
         }
         int_t reg = destionationRegister;

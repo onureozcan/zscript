@@ -4,6 +4,10 @@ class Hello(){
 
     sayHello();
 
+    function setHelloMessage(message){
+        hello_message = message;
+    }
+
     function sayHello(){
         print(hello_message);
     }

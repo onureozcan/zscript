@@ -54,7 +54,7 @@ typedef struct z_interpreter_state_t {
     void *current_context;
     char *byte_stream;
     int_t fsize;
-    z_instruction_t* instruction_pointer;
+    z_instruction_t *instruction_pointer;
 } z_interpreter_state_t;
 
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state);
@@ -578,7 +578,30 @@ OP_SET_FIELD :
         }
         INIT_R0;
         INIT_R2;
-        if (r0->type != TYPE_NUMBER) {
+        //set field of this...
+        if (instruction_ptr->r0 == 1) {
+            //iterate through scopes and set the value when you find
+            z_object_t *context = current_context;
+            while (context != NULL) {
+                map_t *symbol_table = context->context_object.symbol_table;
+                if (!symbol_table) {
+                    //build symbol table
+                    symbol_table = build_symbol_table(
+                            byte_stream + context->context_object.symbols_address
+                    );
+                    context->context_object.symbol_table = symbol_table;
+                }
+                int_t *index_ptr = ((int_t *) map_get(symbol_table, field_name_to_get));
+                if (index_ptr) {
+                    int_t index = *index_ptr;
+                    *(((z_reg_t *) context->context_object.locals) + index) = *r2;
+                    //found!
+                    GOTO_NEXT;
+                }
+                context = (z_object_t *) context->context_object.parent_context;
+            }
+            error_and_exit("no such variable found to set");
+        } else if (r0->type != TYPE_NUMBER) {
             if (r0->type != TYPE_INSTANCE) {
                 object_to_search_on = (z_object_t *) r0->val;
                 map_insert(object_to_search_on->properties, field_name_to_get, r2);
@@ -605,13 +628,14 @@ OP_CALL :
             z_object_t *function_ref = (z_object_t *) r0->val;
             //someone else's function...
             if (function_ref->function_ref_object.responsible_interpreter_state != initial_state) {
-                z_interpreter_state_t* other_state = function_ref->function_ref_object.responsible_interpreter_state;
+                z_interpreter_state_t *other_state = function_ref->function_ref_object.responsible_interpreter_state;
                 z_object_t *called_fnc = context_new();
                 called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
                 called_fnc->context_object.return_context = NULL;
                 called_fnc->context_object.return_address = NULL;
                 called_fnc->context_object.requested_return_register_index = instruction_ptr->r1;
-                other_state->instruction_pointer = (z_instruction_t *) (other_state->byte_stream + function_ref->function_ref_object.start_address);
+                other_state->instruction_pointer = (z_instruction_t *) (other_state->byte_stream +
+                                                                        function_ref->function_ref_object.start_address);
                 other_state->current_context = called_fnc;
                 z_interpreter_run(other_state);
                 instruction_ptr++;

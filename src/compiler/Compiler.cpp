@@ -30,7 +30,7 @@ public :
     Compiler(ClassDeclaration *ast) {
         AddressCalculator *addressCalculator = new AddressCalculator(ast);
         compileClass((ast));
-        //program->print();
+        program->print();
         Assembler assembler;
         bytes = assembler.toBytes(program, &len);
         //ast->print();

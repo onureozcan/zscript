@@ -12,6 +12,10 @@ class Scopes(){
         };
     }
 
+    function setA(b){
+        a = b;
+    }
+
     test1();
     closureTest()();
 }
