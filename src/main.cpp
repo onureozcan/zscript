@@ -50,7 +50,14 @@ int main(int argc, const char *argv[]) {
         runMode = true;
     }
     size_t len = 0;
-    char *bytes = compile_file(filename, &len);
+    char* file_path  = NULL;
+    if (class_path == NULL){
+        file_path = (char *)(filename);
+    } else {
+        file_path = (char*)z_alloc_or_die(strlen(class_path) +  strlen(filename) + 2);
+        sprintf(file_path,"%s/%s",class_path,filename);
+    }
+    char *bytes = compile_file(file_path, &len);
     object_manager_init(class_path);
     if (runMode) {
         clock_t begin = clock();
@@ -59,6 +66,13 @@ int main(int argc, const char *argv[]) {
         initial_state->byte_stream = bytes;
         initial_state->current_context = NULL;
         initial_state->instruction_pointer = NULL;
+        //TODO:ensure that filename matches classname.
+        char* class_name = (char *)(z_alloc_or_die(strlen(filename)));
+        strcpy(class_name,filename);
+        class_name[strlen(filename)-3] = 0;
+        object_manager_register_object_type(class_name,bytes,len);
+        initial_state->class_name = class_name;
+        interpreter_run_static_constructor(bytes,class_name);
         initial_state = z_interpreter_run(initial_state);
         clock_t end = clock();
         double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;

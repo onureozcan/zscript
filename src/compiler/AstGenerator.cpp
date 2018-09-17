@@ -8,16 +8,41 @@ class AstGenerator {
 
 public:
     ClassDeclaration *cls = NULL;
+    Function *staticConstructor = new Function();
+
 
     AstGenerator(zeroscriptParser::ClassDeclarationContext *classDeclaration) {
-
+        staticConstructor->setIdentifier("__static__constructor__");
+        staticConstructor->body = new Body();
+        staticConstructor->arguments = new ArgumentList();
         visitClassDeclaration(classDeclaration);
-
+        Statement *stmt = new Statement();
+        this->cls->body->statements->push_back(stmt);
+        stmt->stmt = staticConstructor;
     }
 
-    Var *visitVarDeclaration(zeroscriptParser::VariableDeclarationPartContext *part, Body *pKind) {
+    void addStaticVar(Var* var){
+        Statement* stmt = new Statement();
+        //static[ident] = value
+        char* ident = var->identifier;
+        BinaryExpression* bop = new BinaryExpression();
+        bop->setOp(".");
+        bop->left = TerminalExpression::identifier("__static__");
+        bop->right = TerminalExpression::stringWithoutTrim(ident);
+
+        BinaryExpression* assign = new BinaryExpression();
+        assign->setOp("=");
+        assign->left = bop;
+        assign->right = var->value;
+
+        stmt->stmt = assign;
+        staticConstructor->body->statements->push_back(stmt);
+    }
+
+    Var *visitVarDeclaration(zeroscriptParser::VariableDeclarationPartContext *part, Body *pKind, bool isStatic) {
         Var *var = new Var();
         var->setIdentifier(part->variableName->IDENT()->getText().data());
+        var->isStatic = isStatic;
         if (part->expression()) {
             var->value = visitExpression(part->expression(), pKind);
         } else var->value = new EmptyExpression();
@@ -27,8 +52,14 @@ public:
     vector<Var *> *visitVar(zeroscriptParser::VarContext *varcontext, Body *pKind) {
         vector<Var *> *vars = new vector<Var *>();
         vector<zeroscriptParser::VariableDeclarationPartContext *> declarations = varcontext->variableDeclarationPart();
-        for (int i = 0; i < declarations.size(); i++) {
-            vars->push_back(visitVarDeclaration(declarations.at(i), pKind));
+        if (varcontext->STATIC() != NULL) {
+            for (int i = 0; i < declarations.size(); i++) {
+                addStaticVar(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL));
+            }
+        } else {
+            for (int i = 0; i < declarations.size(); i++) {
+                vars->push_back(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL));
+            }
         }
         return vars;
     }
@@ -431,14 +462,15 @@ public:
         } else if (statement->throw_()) {
             //TODO
         }
-        stmt = resultStatements->at(0);
-        stmt->hasBreak = statement->BREAK() != NULL;
-        stmt->hasContinue = statement->CONTINUE() != NULL;
-        stmt->hasReturn = statement->RET() != NULL;
-        if (stmt->hasBreak || stmt->hasContinue) {
-            stmt->stmt = new EmptyExpression();
+        if (resultStatements->size() > 0) {
+            stmt = resultStatements->at(0);
+            stmt->hasBreak = statement->BREAK() != NULL;
+            stmt->hasContinue = statement->CONTINUE() != NULL;
+            stmt->hasReturn = statement->RET() != NULL;
+            if (stmt->hasBreak || stmt->hasContinue) {
+                stmt->stmt = new EmptyExpression();
+            }
         }
-
         return resultStatements;
     }
 

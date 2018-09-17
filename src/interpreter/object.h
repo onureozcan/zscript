@@ -9,6 +9,7 @@ typedef struct z_type_info_t {
     char *class_name;
     char *bytecode_stream;
     int_t bytecode_size;
+    map_t *static_variables;
     void* saved_state;
 } z_type_info_t;
 
@@ -20,9 +21,10 @@ typedef struct z_object {
     int_t ref_count;
     map_t *properties;
     void* key_list_cache;
+    struct operations operations;
     union {
         struct {
-            struct z_type_info_t type_info;
+            z_type_info_t* type_info;
             z_interpreter_state_t* saved_state;
         } ordinary_object;
         struct {
@@ -43,7 +45,6 @@ typedef struct z_object {
             z_interpreter_state_t *responsible_interpreter_state;
         } function_ref_object;
     };
-    struct operations operations;
 } z_object_t;
 Z_INLINE z_object_t *object_new(char *class_name);
 Z_INLINE z_object_t *string_new(char *data);

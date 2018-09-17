@@ -78,11 +78,11 @@ anonymousFunction:
     ;
 
 function:
-    FUNC? functionName = identifier '(' argumentsList ')' body
+    STATIC? FUNC? functionName = identifier '(' argumentsList ')' body
     ;
 
 var:
-    VAR variableDeclarationPart  (',' variableDeclarationPart)*
+    STATIC? VAR variableDeclarationPart  (',' variableDeclarationPart)*
     ;
 
 variableDeclarationPart:
@@ -176,6 +176,7 @@ SWITCH             : 'switch';
 IN                 : 'in';
 CASE               : 'case';
 DEFAULT            : 'default';
+STATIC             : 'static';
 
 // Literals
 INT             : '0'|[1-9][0-9]* ;

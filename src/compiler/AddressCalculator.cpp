@@ -77,7 +77,8 @@ public:
     }
 
     void calculateVar(Var *var) {
-        addToCurrentTable(var->identifier);
+        if (!var->isStatic)
+            addToCurrentTable(var->identifier);
     }
 
 };

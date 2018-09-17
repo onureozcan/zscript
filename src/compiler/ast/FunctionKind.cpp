@@ -8,6 +8,7 @@ public:
     map<string, int> *symbolTable = new map<string, int>();
     map<int, bool> *registerTable = new map<int, bool>();
     vector<AST *> *functionsToCompile = new vector<AST *>();
+    int_t isStatic;
 
     void freeRegister(int index) {
         if (index > symbolTable->size()) {

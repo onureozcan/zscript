@@ -13,6 +13,7 @@ public:
 
     char *identifier;
     Expression *value;
+    bool isStatic;
 
     void setIdentifier(const char *data) {
         char *temp = (char *) (malloc(sizeof(char) * strlen(data) + 1));
@@ -22,6 +23,9 @@ public:
     }
 
     void print() override {
+        if(isStatic){
+            cout << "static ";
+        }
         cout << "var `" << identifier << "` = ";
         value->print();
     }

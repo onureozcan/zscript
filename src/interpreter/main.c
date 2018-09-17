@@ -7,7 +7,7 @@
 #include "../program/instruction.h"
 
 #define USE_DIRECT_THREADING
-#define NO_DYNAMIC_COMPILATION
+//#define NO_DYNAMIC_COMPILATION
 
 #ifdef USE_DIRECT_THREADING
 #include "interpreter_dd.c"

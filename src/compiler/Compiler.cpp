@@ -10,6 +10,7 @@ class Compiler {
     stack<FunctionKind *> *functionsStack = new stack<FunctionKind *>();
     stack<char *> *loopEndLabelsStack = new stack<char *>();
     stack<char *> *loopStartLabelsStack = new stack<char *>();
+    vector<char *> *compiledStaticFunctions = new vector<char*>();
 
     int labelCount = 0;
 
@@ -30,7 +31,7 @@ public :
     Compiler(ClassDeclaration *ast) {
         AddressCalculator *addressCalculator = new AddressCalculator(ast);
         compileClass((ast));
-        program->print();
+        //program->print();
         Assembler assembler;
         bytes = assembler.toBytes(program, &len);
         //ast->print();
@@ -57,20 +58,38 @@ public :
         for (; i > -1; i--) {
             char *ident = func->arguments->identifiers->at(i)->data;
             uint_t identReg = (uint_t) (func->getRegister(ident));
-            program->addComment( "pop arg %i (%s)", i, ident);
+            program->addComment("pop arg %i (%s)", i, ident);
             program->addInstruction(POP, identReg, (uint_t) NULL,
-                                      (uint_t) NULL);
+                                    (uint_t) NULL);
         }
-        program->addComment( "mov function ptr to register for %s", func->identifier);
-        program->addInstruction( MOV_FNC, getRegister(func->identifier),
-                                 (uint64_t) func->identifier, NULL);
+        program->addComment("mov function ptr to register for %s", func->identifier);
+        program->addInstruction(MOV_FNC, (uint_t) getRegister(func->identifier),
+                                (uint64_t) func->identifier, NULL);
+        if (strcmp(func->identifier, "__static__constructor__") == 0) {
+            //if this is the static constructor, add all other static functions to the __static__ variable
+            uint_t staticsRegister = static_cast<uint_t>(getRegister(NULL));
+            program->addInstruction(GET_FIELD_IMMEDIATE,0,(uint_t) "__static__", staticsRegister);
+            uint_t fncNameRegister = static_cast<uint_t>(getRegister(NULL));
+            uint_t fncRefRegister = static_cast<uint_t>(getRegister(NULL));
+            for(int_t i =0;i<compiledStaticFunctions->size();i++){
+                char* fncName = compiledStaticFunctions-> at(i);
+                program->addComment("mov function ptr to register for %s", fncName);
+                program->addInstruction(MOV_FNC, (uint_t) fncRefRegister,
+                                        (uint_t) fncName, NULL);
+                program->addInstruction(MOV_STR,fncNameRegister,(uint_t)fncName,0);
+                program->addInstruction(SET_FIELD,staticsRegister,fncNameRegister,fncRefRegister);
+            }
+        } else if(func->isStatic){
+            //if this is a static method, register it to further usage
+            compiledStaticFunctions->push_back(func->identifier);
+        }
         compileBody(func->body);
         program->addInstruction(RETURN, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
         compileRemainingFunctions();
         uint_t locals_count = func->registerTable->size() + func->symbolTable->size();
         //set locals count
         ((z_instruction_t *) arraylist_get(program->instructions, index))->r0 = locals_count;
-        ((z_instruction_t *) arraylist_get(program->instructions, index))->r1 = (uint_t)(func->symbolTable);
+        ((z_instruction_t *) arraylist_get(program->instructions, index))->r1 = (uint_t) (func->symbolTable);
         functionsStack->pop();
     }
 
@@ -85,32 +104,32 @@ public :
         sprintf(lcond_label, ".lcond_%d", ++labelCount);
 
         if (pLoop->startExpr) {
-            program->addComment( "loop start expression");
+            program->addComment("loop start expression");
             uint_t startReg = compileExpression(pLoop->startExpr);
             freeRegister(startReg);
         }
-        program->addComment( "jump to condition");
+        program->addComment("jump to condition");
         program->addInstruction(JMP, (uint_t) lcond_label, (uint_t) NULL,
-                                  (uint_t) NULL);
-        program->addLabel( lstart_label);
-        program->addComment( "loop body");
+                                (uint_t) NULL);
+        program->addLabel(lstart_label);
+        program->addComment("loop body");
         compileBody(pLoop->body);
         if (pLoop->iterExpr) {
-            program->addComment( "loop iteration");
+            program->addComment("loop iteration");
             uint_t iterReg = compileExpression(pLoop->iterExpr);
             freeRegister(iterReg);
         }
-        program->addLabel( lcond_label);
+        program->addLabel(lcond_label);
         if (pLoop->condition) {
-            program->addComment( "loop condition");
+            program->addComment("loop condition");
             uint_t condReg = compileExpression(pLoop->condition);
-            program->addComment( "jump to the end if loop condition fails");
+            program->addComment("jump to the end if loop condition fails");
 
             program->addInstruction(JMP_TRUE, condReg, (uint_t) lstart_label,
-                                      (uint_t) NULL);
+                                    (uint_t) NULL);
             freeRegister(condReg);
         }
-        program->addLabel( lend_label);
+        program->addLabel(lend_label);
         loopEndLabelsStack->pop();
     }
 
@@ -119,38 +138,38 @@ public :
         sprintf(if_fail_label, ".else_%d", ++labelCount);
         char *con_end_label = static_cast<char *>(malloc(100));
         sprintf(con_end_label, ".end_cond_%d", ++labelCount);
-        program->addComment( "if condition");
+        program->addComment("if condition");
         uint_t cond_reg = compileExpression(pConditional->condition);
-        program->addComment( "jump if condition is not satisfied");
+        program->addComment("jump if condition is not satisfied");
         program->addInstruction(JMP_NOT_TRUE, (uint_t) cond_reg, (uint_t) if_fail_label,
-                                  (uint_t) NULL);
+                                (uint_t) NULL);
         freeRegister(cond_reg);
         compileBody(pConditional->body);
         if (pConditional->elseBody) {
-            program->addInstruction( NOP, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
-            program->addInstruction( JMP, (uint_t) con_end_label, (uint_t) NULL,
-                                      (uint_t) NULL);
+            program->addInstruction(NOP, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
+            program->addInstruction(JMP, (uint_t) con_end_label, (uint_t) NULL,
+                                    (uint_t) NULL);
         }
-        program->addLabel( if_fail_label);
+        program->addLabel(if_fail_label);
         if (pConditional->elseBody) {
             compileBody(pConditional->elseBody);
         }
-        program->addLabel( con_end_label);
+        program->addLabel(con_end_label);
     }
 
     void compileVar(Var *pVar) {
         uint_t reg = (uint_t) getRegister(pVar->identifier);
         uint_t valueReg = compileExpression(pVar->value);
-        program->addInstruction( MOV, reg, valueReg, (uint_t) NULL);
+        program->addInstruction(MOV, reg, valueReg, (uint_t) NULL);
         freeRegister(valueReg);
     }
 
     void compileStmt(Statement *statement) {
         if (statement->hasBreak) {
-            program->addComment( "break ");
+            program->addComment("break ");
             char *lend_label = loopEndLabelsStack->top();
-            program->addInstruction( JMP, (uint_t) lend_label,
-                                      (uint_t) NULL, (uint_t) NULL);
+            program->addInstruction(JMP, (uint_t) lend_label,
+                                    (uint_t) NULL, (uint_t) NULL);
         }
         AST *stmt = statement->stmt;
         if (stmt->kind == AST::AST_KIND_FUNCTION) {
@@ -167,8 +186,8 @@ public :
         } else if (dynamic_cast<Expression *>(stmt)) {
             uint_t reg = compileExpression(dynamic_cast<Expression *>(stmt));
             if (statement->hasReturn) {
-                program->addComment( " return %d", reg);
-                program->addInstruction( RETURN, reg, (uint_t) NULL, (uint_t) NULL);
+                program->addComment(" return %d", reg);
+                program->addInstruction(RETURN, reg, (uint_t) NULL, (uint_t) NULL);
             }
             freeRegister(reg);
         }
@@ -181,8 +200,8 @@ public :
             AST *stmt = statements->at(i)->stmt;
             if (stmt->kind == AST::AST_KIND_FUNCTION) {
                 Function *func = dynamic_cast<Function *>(stmt);
-                program->addComment( "mov function ptr to register for %s", func->identifier);
-                program->addInstruction(MOV_FNC, (uint_t)(getRegister(func->identifier)),
+                program->addComment("mov function ptr to register for %s", func->identifier);
+                program->addInstruction(MOV_FNC, (uint_t) (getRegister(func->identifier)),
                                         (uint_t) func->identifier, NULL);
             }
 
@@ -207,16 +226,16 @@ public :
     }
 
     void compileClass(ClassDeclaration *cls) {
-        program->addLabel( "%s", cls->identifier);
-        uint_t index = program->addInstruction( FFRAME, NULL, NULL, NULL);
+        program->addLabel("%s", cls->identifier);
+        uint_t index = program->addInstruction(FFRAME, NULL, NULL, NULL);
         functionsStack->push(cls);
         compileBody(cls->body);
-        program->addInstruction( RETURN, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
+        program->addInstruction(RETURN, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
         compileRemainingFunctions();
         uint_t locals_count = cls->registerTable->size() + cls->symbolTable->size();
         //set args of FFRAME
         ((z_instruction_t *) arraylist_get(program->instructions, index))->r0 = locals_count;
-        ((z_instruction_t *) arraylist_get(program->instructions, index))->r1 = (uint_t)(cls->symbolTable);
+        ((z_instruction_t *) arraylist_get(program->instructions, index))->r1 = (uint_t) (cls->symbolTable);
         functionsStack->pop();
     }
 

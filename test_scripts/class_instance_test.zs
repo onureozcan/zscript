@@ -1,5 +1,13 @@
 class ClassInstanceTest()
 {
+    print("************ STATIC VARIABLES TEST **********************");
+    print("static varibale in StaticVariables.staticVariable is :"+StaticVariables.staticVariable);
+    print("make it 100");
+    StaticVariables.staticVariable = 100;
+    print("static varibale in StaticVariables.staticVariable is :"+StaticVariables.staticVariable);
+    print("************ STATIC METHOD TEST **********************");
+    StaticVariables.osman();
+    print("************ CLASS INSTANCE TEST **********************");
     print("creating an instance of Hello class...");
     var helloObject = new Hello();
     var message = helloObject.helloMessage;
@@ -14,4 +22,8 @@ class ClassInstanceTest()
     helloObject.sayHello();
     print("invoke closure on helloObject");
     helloObject.closureTest()();
+    print("fncRef test");
+    helloObject.fncRefTest(function(x){
+        print(x);
+    });
 }

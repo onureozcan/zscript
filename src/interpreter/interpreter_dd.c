@@ -8,7 +8,7 @@
 #define TYPE_OBJ 16
 #define TYPE_NATIVE_FUNC 32
 #define TYPE_INSTANCE 64
-#define TYPE_CONSTRUCTOR_REF 128
+#define TYPE_CLASS_REF 128
 
 //#define PRE_CALCULATE_JUMP_POINTERS
 
@@ -53,12 +53,15 @@ Z_INLINE static char *strconcat(const char *s1, const char *s2);
 typedef struct z_interpreter_state_t {
     void *current_context;
     char *byte_stream;
+    char *class_name;
     int_t fsize;
-    z_instruction_t *instruction_pointer;
+    int_t instruction_pointer;
     z_reg_t return_value;
 } z_interpreter_state_t;
 
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state);
+
+void interpreter_run_static_constructor(char *byte_stream, char *class_name);
 
 /**
  * get a field of an object.
@@ -197,7 +200,7 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
     if (initial_state->instruction_pointer == NULL) {
         instruction_ptr = (z_instruction_t *) code;
     } else {
-        instruction_ptr = initial_state->instruction_pointer;
+        instruction_ptr = (z_instruction_t *) (byte_stream + initial_state->instruction_pointer);
     }
     GOTO_CURRENT;
 OP_MOV_NUMBER:
@@ -536,8 +539,16 @@ OP_GET_FIELD_IMMEDIATE :
                 }
                 context = (z_object_t *) context->context_object.parent_context;
             }
-            //not found, maybe a class constructor?
-            r2->type = TYPE_CONSTRUCTOR_REF;
+            //not found? maybe a static variable?
+            char *class_name = (char *) initial_state->class_name;
+            z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name);
+            z_reg_t *prop = (z_reg_t *) map_get(type_info->static_variables, field_name_to_get);
+            if (prop) {
+                *r2 = *prop;
+                GOTO_NEXT;
+            }
+            //not found? maybe a class constructor?
+            r2->type = TYPE_CLASS_REF;
             r2->val = (int_t) field_name_to_get;
         } else {
             //access r0 and search upon it
@@ -545,7 +556,17 @@ OP_GET_FIELD_IMMEDIATE :
             INIT_R2;
             if (r0->type != TYPE_NUMBER) {
                 object_to_search_on = (z_object_t *) r0->val;
-                if (r0->type != TYPE_INSTANCE) {
+                if (r0->type == TYPE_CLASS_REF) {
+                    //static method call
+                    char *class_name = (char *) r0->val;
+                    z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name);
+                    z_reg_t *prop = (z_reg_t *) map_get(type_info->static_variables, field_name_to_get);
+                    if (prop) {
+                        *r2 = *prop;
+                    } else {
+                        error_and_exit("cannot read property");
+                    }
+                } else if (r0->type != TYPE_INSTANCE) {
                     z_reg_t *prop = (z_reg_t *) map_get(object_to_search_on->properties,
                                                         field_name_to_get);
                     if (prop) {
@@ -604,10 +625,18 @@ OP_SET_FIELD :
             error_and_exit("no such variable found to set");
         } else if (r0->type != TYPE_NUMBER) {
             if (r0->type != TYPE_INSTANCE) {
-                object_to_search_on = (z_object_t *) r0->val;
-                map_insert(object_to_search_on->properties, field_name_to_get, r2);
-                //we changed a property and the cache is now garbage.
-                object_to_search_on->key_list_cache = NULL;
+                if (r0->type == TYPE_CLASS_REF) {
+                    char *class_name = (char *) r0->val;
+                    //static has a special meaning for us
+                    if (strcmp(class_name, "__static__") == 0) class_name = initial_state->class_name;
+                    z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name);
+                    map_insert(type_info->static_variables, field_name_to_get, r2);
+                } else {
+                    object_to_search_on = (z_object_t *) r0->val;
+                    map_insert(object_to_search_on->properties, field_name_to_get, r2);
+                    //we changed a property and the cache is now garbage.
+                    object_to_search_on->key_list_cache = NULL;
+                }
             } else {
                 //set field by using symbol table of this instance
                 object_to_search_on = (z_object_t *) r0->val;
@@ -635,8 +664,7 @@ OP_CALL :
                 called_fnc->context_object.return_context = NULL;
                 called_fnc->context_object.return_address = NULL;
                 called_fnc->context_object.requested_return_register_index = instruction_ptr->r1;
-                other_state->instruction_pointer = (z_instruction_t *) (other_state->byte_stream +
-                                                                        function_ref->function_ref_object.start_address);
+                other_state->instruction_pointer = (function_ref->function_ref_object.start_address);
                 other_state->current_context = called_fnc;
                 z_interpreter_run(other_state);
                 INIT_R1;
@@ -654,7 +682,7 @@ OP_CALL :
                 current_context = called_fnc;
             }
             GOTO_CURRENT;
-        } else if (r0->type == TYPE_CONSTRUCTOR_REF) {
+        } else if (r0->type == TYPE_CLASS_REF) {
             INIT_R1;
             r1->type = TYPE_INSTANCE;
             r1->val = (int_t) object_new((char *) r0->val);
@@ -711,6 +739,28 @@ OP_FFRAME :
     }
 end:
     return initial_state;
+}
+
+/**
+ * runs static constructor of a given compiled class.
+ * @param bytes
+ */
+void interpreter_run_static_constructor(char *bytes, char *class_name) {
+    int_t *static_block_ptr_ptr = (int_t *) (bytes + sizeof(int_t));
+    int_t static_block_ptr = *static_block_ptr_ptr;
+    z_interpreter_state_t *temp_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
+    temp_state->byte_stream = bytes;
+    z_object_t *context = context_new();;
+    temp_state->current_context = context;
+    temp_state->class_name = class_name;
+    temp_state->instruction_pointer = static_block_ptr;
+    z_object_t *called_fnc = context_new();
+    called_fnc->context_object.parent_context = NULL;
+    called_fnc->context_object.return_context = NULL;
+    called_fnc->context_object.return_address = NULL;
+    called_fnc->context_object.requested_return_register_index = 0;
+    temp_state->current_context = called_fnc;
+    z_interpreter_run(temp_state);
 }
 
 /**

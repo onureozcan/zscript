@@ -10,7 +10,7 @@ public:
     Body *body = NULL;
 
     void setIdentifier(const char *data) {
-        char *temp = (char *) (malloc(sizeof(char) * strlen(data)+1));
+        char *temp = (char *) (malloc(sizeof(char) * strlen(data) + 1));
         memset(temp, 0, strlen(data) + 1);
         strcpy(temp, data);
         this->identifier = temp;

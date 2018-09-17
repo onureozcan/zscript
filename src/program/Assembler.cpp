@@ -27,9 +27,10 @@ class Assembler {
         addData((char *) &sizeof_constants, sizeof(uint_t));
 
         //place and calculate strings aka constants
+        int_t ip_of_static_const = addData(" ", sizeof(int_t));
         for (int i = 0; i < program->instructions->size; i++) {
             z_instruction_t instruction = *((z_instruction_t *) arraylist_get(program->instructions, i));
-            if (instruction.opcode == MOV_STR || instruction.opcode == GET_FIELD_IMMEDIATE ) {
+            if (instruction.opcode == MOV_STR || instruction.opcode == GET_FIELD_IMMEDIATE) {
                 char *str = (char *) instruction.r1;
                 z_instruction_t *instruction_ptr = ((z_instruction_t *) arraylist_get(program->instructions, i));
                 instruction_ptr->r1 = (addData(str, (uint_t) (strlen(str) + 1)));
@@ -41,8 +42,7 @@ class Assembler {
 
                 // Defining a lambda function to compare two pairs. It will compare two pairs using second field
                 Comparator compFunctor =
-                        [](std::pair<std::string, int> elem1 ,std::pair<std::string, int> elem2)
-                        {
+                        [](std::pair<std::string, int> elem1, std::pair<std::string, int> elem2) {
                             return elem1.second < elem2.second;
                         };
 
@@ -51,11 +51,11 @@ class Assembler {
                         symbolTable.begin(), symbolTable.end(), compFunctor);
                 int i = 0;
                 int_t size = symbolTable.size();
-                instruction_ptr->r1 = addData((char*)&size, sizeof(int_t));
+                instruction_ptr->r1 = addData((char *) &size, sizeof(int_t));
                 // Iterate over a set using range base for loop
                 // It will display the items in sorted order of properties
-                for (std::pair<std::string, int> pair : setOfWords){
-                    char* str = (char*)pair.first.data();
+                for (std::pair<std::string, int> pair : setOfWords) {
+                    char *str = (char *) pair.first.data();
                     uint_t pos = (addData(str, (uint_t) (strlen(str) + 1)));
                     i++;
                 }
@@ -71,6 +71,11 @@ class Assembler {
             if (instruction.opcode == LABEL) {
                 // cout << " PUT: `" << (char *) instruction.r0 << "` " << ftell(o_file) + lpos << "\n";
                 label_position_map[(char *) instruction.r0] = sizeof_constants + lpos;
+                //put position of static constructor
+                if (strcmp((char *) instruction.r0, "__static__constructor__") == 0) {
+                    uint_t *second_int = (uint_t *) (bytes + sizeof(int_t));
+                    *second_int = sizeof_constants + lpos;
+                }
             } else if (instruction.opcode != COMMENT) {
                 lpos += sizeof(uint_t) * 4;
             }

@@ -36,6 +36,12 @@ public:
         return self;
     }
 
+    static TerminalExpression *stringWithoutTrim(const char *data) {
+        TerminalExpression *self = getOne(data);
+        self->type = TYPE_STRING;
+        return self;
+    }
+
     static TerminalExpression *string(const char *data) {
         TerminalExpression *self = getOne(data + 1);
         self->type = TYPE_STRING;

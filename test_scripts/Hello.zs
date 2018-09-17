@@ -23,4 +23,8 @@ class Hello(){
         };
     }
 
+    function fncRefTest(fncRef){
+        fncRef("hi");
+    }
+
 }
