@@ -5,4 +5,5 @@ class StaticVariables(){
         print("i am a static function");
         print("i am a static variable:"+staticVariable);
     }
+
 }

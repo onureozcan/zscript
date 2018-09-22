@@ -82,6 +82,7 @@ public:
         func->setIdentifier(pContext->functionName->IDENT()->getText().data());
         func->body = visitBody(pContext->body(), pKind);
         func->arguments = visitArguments(pContext->argumentsList(), pKind);
+        func->isStatic = pContext->STATIC()!= NULL;
         return func;
     }
 

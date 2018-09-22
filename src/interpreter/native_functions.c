@@ -78,6 +78,13 @@ z_reg_t *native_print(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     return stack;
 }
 
+z_reg_t *native_to_int(z_reg_t *stack, z_reg_t *return_reg, z_object_t *object) {
+    z_reg_t *arg = stack--;
+    return_reg->number_val = ((int_t)arg->number_val);
+    return_reg->type = TYPE_NUMBER;
+    return stack;
+}
+
 native_fnc_t *wrap_native_fnc(z_reg_t *(*fnc)(z_reg_t *, z_reg_t *, z_object_t *)) {
     native_fnc_t *wrapper = (native_fnc_t *) z_alloc_or_die(sizeof(native_fnc_t));
     wrapper->fnc = fnc;
@@ -93,4 +100,6 @@ void z_native_funcions_init() {
     map_insert(native_functions, "Object", &wrapper);
     wrapper.fnc = native_number;
     map_insert(native_functions, "number", &wrapper);
+    wrapper.fnc = native_to_int;
+    map_insert(native_functions, "toInt", &wrapper);
 }

@@ -79,6 +79,7 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char 
  */
 void interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_set, z_reg_t *value);
 
+#include <cmath>
 #include "object.h"
 #include "native_functions.c"
 #include "object.c";
@@ -335,7 +336,7 @@ OP_MOD :
         INIT_R1;
         INIT_R2;
         if (r0->type == TYPE_NUMBER) {
-            r2->number_val = (int_t) r0->number_val % (int_t) r1->number_val;
+            r2->number_val = fmod( r0->number_val, r1->number_val);//(int_t) r0->number_val % (int_t) r1->number_val;
             r2->type = TYPE_NUMBER;
         } else {
             //TODO:operator overloading

@@ -7,6 +7,8 @@ class ClassInstanceTest()
     print("static varibale in StaticVariables.staticVariable is :"+StaticVariables.staticVariable);
     print("************ STATIC METHOD TEST **********************");
     StaticVariables.osman();
+    print("floor:" + Math.floor(5.25));
+    print("round:" + Math.round(5.65));
     print("************ CLASS INSTANCE TEST **********************");
     print("creating an instance of Hello class...");
     var helloObject = new Hello();

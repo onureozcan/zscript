@@ -104,7 +104,7 @@ void load_class_code(const char *class_name, char **bytes, size_t *fsize) {
     FILE *f = fopen(file_to_load, "rb");
     if (f == NULL) {
 #ifndef NO_DYNAMIC_COMPILATION
-                //may be not compiled yet?
+                //maybe not compiled yet?
                 sprintf(file_to_load, "%s/%s.zs", class_path, class_name);
                 f = fopen(file_to_load, "rb");
                 if (f == NULL) {
