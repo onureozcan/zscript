@@ -21,11 +21,11 @@ char *compile_file(const char *filename, size_t *len) {
     zeroscriptLexer lexer(&input);
     CommonTokenStream tokens(&lexer);
     zeroscriptParser parser(&tokens);
-    AstGenerator *astGenerator = new AstGenerator(parser.classDeclaration());
-    ClassDeclaration *cls = astGenerator->getRootClass();
-    Compiler *compiler = new Compiler(cls);
+    AstGenerator astGenerator = AstGenerator(parser.classDeclaration());
+    ClassDeclaration *cls = astGenerator.getRootClass();
+    Compiler compiler = Compiler(cls);
     size_t mlen = 0;
-    char *bytes = compiler->toBytes(&mlen);
+    char *bytes = compiler.toBytes(&mlen);
     *len = mlen;
     return bytes;
 }
@@ -50,29 +50,29 @@ int main(int argc, const char *argv[]) {
         runMode = true;
     }
     size_t len = 0;
-    char* file_path  = NULL;
-    if (class_path == NULL){
-        file_path = (char *)(filename);
+    char *file_path = NULL;
+    if (class_path == NULL) {
+        file_path = (char *) (filename);
     } else {
-        file_path = (char*)z_alloc_or_die(strlen(class_path) +  strlen(filename) + 2);
-        sprintf(file_path,"%s/%s",class_path,filename);
+        file_path = (char *) z_alloc_or_die(strlen(class_path) + strlen(filename) + 2);
+        sprintf(file_path, "%s/%s", class_path, filename);
     }
     char *bytes = compile_file(file_path, &len);
     object_manager_init(class_path);
     if (runMode) {
         clock_t begin = clock();
-        z_interpreter_state_t* initial_state = (z_interpreter_state_t*) z_alloc_or_die(sizeof(z_interpreter_state_t));
+        z_interpreter_state_t *initial_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
         initial_state->fsize = len;
         initial_state->byte_stream = bytes;
         initial_state->current_context = NULL;
         initial_state->instruction_pointer = NULL;
         //TODO:ensure that filename matches classname.
-        char* class_name = (char *)(z_alloc_or_die(strlen(filename)));
-        strcpy(class_name,filename);
-        class_name[strlen(filename)-3] = 0;
-        object_manager_register_object_type(class_name,bytes,len);
+        char *class_name = (char *) (z_alloc_or_die(strlen(filename) + 1));
+        strcpy(class_name, filename);
+        class_name[strlen(filename) - 3] = 0;
+        object_manager_register_object_type(class_name, bytes, len);
         initial_state->class_name = class_name;
-        interpreter_run_static_constructor(bytes,class_name);
+        interpreter_run_static_constructor(bytes, class_name);
         initial_state = z_interpreter_run(initial_state);
         clock_t end = clock();
         double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;

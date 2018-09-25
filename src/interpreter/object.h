@@ -44,6 +44,9 @@ typedef struct z_object {
             void *parent_context;
             z_interpreter_state_t *responsible_interpreter_state;
         } function_ref_object;
+        struct {
+            char *value;
+        } class_ref_object;
     };
 } z_object_t;
 Z_INLINE z_object_t *object_new(char *class_name);

@@ -550,7 +550,7 @@ OP_GET_FIELD_IMMEDIATE :
             }
             //not found? maybe a class constructor?
             r2->type = TYPE_CLASS_REF;
-            r2->val = (int_t) field_name_to_get;
+            r2->val = (int_t) class_ref_new(field_name_to_get);
         } else {
             //access r0 and search upon it
             INIT_R0;
@@ -559,7 +559,7 @@ OP_GET_FIELD_IMMEDIATE :
                 object_to_search_on = (z_object_t *) r0->val;
                 if (r0->type == TYPE_CLASS_REF) {
                     //static method call
-                    char *class_name = (char *) r0->val;
+                    char *class_name = ((z_object_t*)r0->val)->class_ref_object.value;
                     z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name);
                     z_reg_t *prop = (z_reg_t *) map_get(type_info->static_variables, field_name_to_get);
                     if (prop) {
@@ -627,7 +627,7 @@ OP_SET_FIELD :
         } else if (r0->type != TYPE_NUMBER) {
             if (r0->type != TYPE_INSTANCE) {
                 if (r0->type == TYPE_CLASS_REF) {
-                    char *class_name = (char *) r0->val;
+                    char *class_name = ((z_object_t*)r0->val)->class_ref_object.value;
                     //static has a special meaning for us
                     if (strcmp(class_name, "__static__") == 0) class_name = initial_state->class_name;
                     z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name);
@@ -686,7 +686,7 @@ OP_CALL :
         } else if (r0->type == TYPE_CLASS_REF) {
             INIT_R1;
             r1->type = TYPE_INSTANCE;
-            r1->val = (int_t) object_new((char *) r0->val);
+            r1->val = (int_t) object_new(((z_object_t*)r0->val)->class_ref_object.value);
         } else {
             error_and_exit("callee is not a function");
         }

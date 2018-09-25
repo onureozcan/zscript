@@ -5,7 +5,7 @@
 class BinaryExpression : public Expression {
 public:
 
-    BinaryExpression(){
+    BinaryExpression() {
         this->kind = AST_KIND_BINARY;
     }
 
@@ -13,7 +13,7 @@ public:
     Expression *left;
     Expression *right;
 
-    static BinaryExpression *create(const char *op, stack<AST*> *astStack) {
+    static BinaryExpression *create(const char *op, stack<AST *> *astStack) {
         BinaryExpression *self = new BinaryExpression();
         self->setOp(op);
         Expression *left = dynamic_cast<Expression *>(astStack->top());
@@ -26,7 +26,7 @@ public:
     }
 
     void setOp(const char *data) {
-        char *temp = (char *) (malloc(sizeof(char) * strlen(data)));
+        char *temp = (char *) (malloc(sizeof(char) * strlen(data) + 1));
         strcpy(temp, data);
         this->op = temp;
     }
