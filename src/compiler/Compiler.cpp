@@ -11,7 +11,7 @@ class Compiler {
     stack<char *> *loopEndLabelsStack = new stack<char *>();
     stack<char *> *loopStartLabelsStack = new stack<char *>();
     vector<char *> *compiledStaticFunctions = new vector<char *>();
-
+    ClassDeclaration* cls;
     int labelCount = 0;
 
     int getRegister(char *ident) {
@@ -29,12 +29,13 @@ class Compiler {
     size_t len = 0;
 public :
     Compiler(ClassDeclaration *ast) {
+        this->cls = ast;
+        //ast->print();
         AddressCalculator *addressCalculator = new AddressCalculator(ast);
         compileClass((ast));
         //program->print();
         Assembler assembler;
         bytes = assembler.toBytes(program, &len);
-        //ast->print();
     }
 
     char *toBytes(size_t *len) {
@@ -66,7 +67,15 @@ public :
         program->addInstruction(MOV_FNC, (uint_t) getRegister(func->identifier),
                                 (uint64_t) func->identifier, NULL);
         if (strcmp(func->identifier, "__static__constructor__") == 0) {
-            //if this is the static constructor, add all other static functions to the __static__ variable
+            //if this is the static constructor, add all other static functions and imports to the __static__ variable
+            for (auto elem : cls->importsMap) {
+                char *first = (char *) malloc(strlen(elem.first.c_str()) + 1);
+                char *second = (char *) malloc(strlen(elem.second.c_str()) + 1);
+                strcpy(first,elem.first.c_str());
+                strcpy(second,elem.second.c_str());
+                //add import instruction
+                program->addInstruction(IMPORT_CLS, (uint_t) first, (uint_t) second, NULL);
+            }
             uint_t staticsRegister = static_cast<uint_t>(getRegister(NULL));
             program->addInstruction(GET_FIELD_IMMEDIATE, 0, (uint_t) "__static__", staticsRegister);
             uint_t fncNameRegister = static_cast<uint_t>(getRegister(NULL));
@@ -229,14 +238,6 @@ public :
         program->addLabel("%s", cls->identifier);
         uint_t index = program->addInstruction(FFRAME, NULL, NULL, NULL);
         functionsStack->push(cls);
-        for (auto elem : cls->importsMap) {
-            char *first = (char *) malloc(strlen(elem.first.c_str()) + 1);
-            char *second = (char *) malloc(strlen(elem.second.c_str()) + 1);
-            strcpy(first,elem.first.c_str());
-            strcpy(second,elem.second.c_str());
-            //add import instruction
-            program->addInstruction(IMPORT_CLS, (uint_t) first, (uint_t) second, NULL);
-        }
         compileBody(cls->body);
         program->addInstruction(RETURN, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
         compileRemainingFunctions();

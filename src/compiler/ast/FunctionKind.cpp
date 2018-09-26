@@ -12,8 +12,11 @@ public:
 
     void freeRegister(int index) {
         if (index > symbolTable->size()) {
-           // cout << "f:" << index << "\n";
-            (*registerTable)[index] = 1;
+            map<int, bool>::iterator it = registerTable->find(index);
+            if(it != registerTable->end())
+            {
+                (*registerTable)[index] = 1;
+            }
         }
     }
 
@@ -52,7 +55,12 @@ public:
         for (auto elem : *symbolTable) {
             cout << elem.first << ":" << elem.second << "\n";
         }
-        cout << "\n";
+    }
+    void printRegisterTable() {
+        cout << "======= register table ========\n";
+        for (auto elem : *registerTable) {
+            cout << elem.first << ":" << elem.second << "\n";
+        }
     }
 
 };

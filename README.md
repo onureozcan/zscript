@@ -83,7 +83,7 @@ class Math(){
 }
 ```
 
--lambda expressions and function references:
+- lambda expressions and function references:
 
 ```
      helloObject.fncRefTest(function(x){
