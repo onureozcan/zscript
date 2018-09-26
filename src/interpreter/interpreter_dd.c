@@ -119,6 +119,11 @@ z_reg_t stack_file[stack_file_size];
 
 z_reg_t *stack_ptr = stack_file;
 
+/**
+ * heart of the interpreter. interprets a given bytecode.
+ * @param initial_state state representation with given parameters.
+ * @return modified state.
+ */
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
 
     char *byte_stream = initial_state->byte_stream;
@@ -519,6 +524,7 @@ OP_GET_FIELD_IMMEDIATE :
             r2->val = (uint_t) native_fnc;
             r2->type = TYPE_NATIVE_FUNC;
         } else if (!lookup_object) {
+        SEARCH_THIS:
             INIT_R2;
             //search `this`
             z_object_t *context = current_context;
@@ -586,6 +592,12 @@ OP_GET_FIELD_IMMEDIATE :
                         error_and_exit("cannot read property");
                     }
                 }
+            }
+            /*the second local variable is this and the second is NULL. in both cases, goto SEARCH_THIS*/
+            else if(r0->number_val == 0 || r0->number_val == 1){
+                goto SEARCH_THIS;
+            } else {
+                //TODO
             }
         }
         GOTO_NEXT;

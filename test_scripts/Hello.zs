@@ -5,15 +5,15 @@ class Hello(){
     sayHello();
 
     function setHelloMessage(message){
-        helloMessage = message;
+        this.helloMessage = message;
     }
 
     function getHelloMessage(){
-        return helloMessage;
+        return this.helloMessage;
     }
 
     function sayHello(){
-        print(helloMessage);
+        print(this.helloMessage);
     }
 
     function closureTest(){
