@@ -114,6 +114,21 @@ class Math(){
 
 ```
 
+- import class files from path
+
+```
+import "../test_scripts/Math" as Math
+import "../test_scripts/Hello" as Hello
+
+class ImportTest(){
+
+    static var a = Math.floor(3.7);
+    print(Math.round(2.34));
+    var hello = new Hello();
+
+}
+
+```
 
 **run as script**:
 
