@@ -30,7 +30,13 @@ class Assembler {
         int_t ip_of_static_const = addData(" ", sizeof(int_t));
         for (int i = 0; i < program->instructions->size; i++) {
             z_instruction_t instruction = *((z_instruction_t *) arraylist_get(program->instructions, i));
-            if (instruction.opcode == MOV_STR || instruction.opcode == GET_FIELD_IMMEDIATE) {
+            if (instruction.opcode == IMPORT_CLS) {
+                char* import = (char *) instruction.r0;
+                char* as = (char *) instruction.r1;
+                z_instruction_t *instruction_ptr = ((z_instruction_t *) arraylist_get(program->instructions, i));
+                instruction_ptr->r1 = (addData(as, (uint_t) (strlen(as) + 1)));
+                instruction_ptr->r0 = (addData(import, (uint_t) (strlen(import) + 1)));
+            } else if (instruction.opcode == MOV_STR || instruction.opcode == GET_FIELD_IMMEDIATE) {
                 char *str = (char *) instruction.r1;
                 z_instruction_t *instruction_ptr = ((z_instruction_t *) arraylist_get(program->instructions, i));
                 instruction_ptr->r1 = (addData(str, (uint_t) (strlen(str) + 1)));

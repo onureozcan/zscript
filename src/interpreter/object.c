@@ -13,6 +13,8 @@ void load_class_code(const char *class_name, char **bytes, size_t *fsize);
 
 void object_manager_register_object_type(char *class_name, char *bytecodes, int_t size);
 
+char *resolveImportedClassName(char *class_name, map_t *imports_table);
+
 #include "types/string.h"
 
 char *class_path = 0;
@@ -47,7 +49,7 @@ struct operations object_operations = {
 void object_manager_init(char *cp) {
     class_path = cp;
     if (cp == NULL) {
-        class_path = "";
+        class_path = ".";
     }
     known_types_map = map_new(sizeof(z_type_info_t));
     native_strlen_wrapper = wrap_native_fnc(native_strlen);
@@ -61,17 +63,28 @@ void object_manager_init(char *cp) {
  * @param class_name class -or type- name to load.
  * @return z_type_info_t.
  */
-z_type_info_t *object_manager_get_or_load_type_info(char *class_name) {
+z_type_info_t *object_manager_get_or_load_type_info(char *class_name, map_t *imports_table) {
     z_type_info_t *type_info = (z_type_info_t *) map_get(known_types_map, class_name);
     if (type_info == NULL) {
         char *bytes = 0;
         size_t fsize;
+        class_name = resolveImportedClassName(class_name, imports_table);
         load_class_code(class_name, &bytes, &fsize);
         object_manager_register_object_type(class_name, bytes, fsize);
         interpreter_run_static_constructor(bytes, class_name);
         type_info = (z_type_info_t *) map_get(known_types_map, class_name);
     }
     return type_info;
+}
+
+char *resolveImportedClassName(char *class_name, map_t *imports_table) {
+    if (imports_table != NULL) {
+            char** imported_path_ptr = (char**)map_get(imports_table, class_name);
+            if (imported_path_ptr!= NULL){
+                class_name = *imported_path_ptr;
+            }
+        }
+    return class_name;
 }
 
 /**
@@ -86,6 +99,7 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
     type_info->bytecode_stream = bytecodes;
     type_info->bytecode_size = size;
     type_info->static_variables = map_new(sizeof(z_reg_t));
+    type_info->imports_table = map_new(sizeof(char *));
     map_insert(known_types_map, class_name, type_info);
 }
 
@@ -98,12 +112,13 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
  * @param class_name class name to load. can be null.
  * @return z_object.
  */
-Z_INLINE z_object_t *object_new(char *class_name) {
+Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table) {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
     obj->properties = map_new(sizeof(z_reg_t));
     obj->key_list_cache;
     obj->ref_count = 0;
     if (class_name) {
+        class_name = resolveImportedClassName(class_name, imports_table);
         z_type_info_t *object_type_info = (z_type_info_t *) map_get(known_types_map, class_name);
         char *bytes = 0;
         size_t fsize;

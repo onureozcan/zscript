@@ -10,7 +10,7 @@ class Compiler {
     stack<FunctionKind *> *functionsStack = new stack<FunctionKind *>();
     stack<char *> *loopEndLabelsStack = new stack<char *>();
     stack<char *> *loopStartLabelsStack = new stack<char *>();
-    vector<char *> *compiledStaticFunctions = new vector<char*>();
+    vector<char *> *compiledStaticFunctions = new vector<char *>();
 
     int labelCount = 0;
 
@@ -68,18 +68,18 @@ public :
         if (strcmp(func->identifier, "__static__constructor__") == 0) {
             //if this is the static constructor, add all other static functions to the __static__ variable
             uint_t staticsRegister = static_cast<uint_t>(getRegister(NULL));
-            program->addInstruction(GET_FIELD_IMMEDIATE,0,(uint_t) "__static__", staticsRegister);
+            program->addInstruction(GET_FIELD_IMMEDIATE, 0, (uint_t) "__static__", staticsRegister);
             uint_t fncNameRegister = static_cast<uint_t>(getRegister(NULL));
             uint_t fncRefRegister = static_cast<uint_t>(getRegister(NULL));
-            for(int_t i =0;i<compiledStaticFunctions->size();i++){
-                char* fncName = compiledStaticFunctions-> at(i);
+            for (int_t i = 0; i < compiledStaticFunctions->size(); i++) {
+                char *fncName = compiledStaticFunctions->at(i);
                 program->addComment("mov function ptr to register for %s", fncName);
                 program->addInstruction(MOV_FNC, (uint_t) fncRefRegister,
                                         (uint_t) fncName, NULL);
-                program->addInstruction(MOV_STR,fncNameRegister,(uint_t)fncName,0);
-                program->addInstruction(SET_FIELD,staticsRegister,fncNameRegister,fncRefRegister);
+                program->addInstruction(MOV_STR, fncNameRegister, (uint_t) fncName, 0);
+                program->addInstruction(SET_FIELD, staticsRegister, fncNameRegister, fncRefRegister);
             }
-        } else if(func->isStatic){
+        } else if (func->isStatic) {
             //if this is a static method, register it to further usage
             compiledStaticFunctions->push_back(func->identifier);
         }
@@ -229,6 +229,14 @@ public :
         program->addLabel("%s", cls->identifier);
         uint_t index = program->addInstruction(FFRAME, NULL, NULL, NULL);
         functionsStack->push(cls);
+        for (auto elem : cls->importsMap) {
+            char *first = (char *) malloc(strlen(elem.first.c_str()) + 1);
+            char *second = (char *) malloc(strlen(elem.second.c_str()) + 1);
+            strcpy(first,elem.first.c_str());
+            strcpy(second,elem.second.c_str());
+            //add import instruction
+            program->addInstruction(IMPORT_CLS, (uint_t) first, (uint_t) second, NULL);
+        }
         compileBody(cls->body);
         program->addInstruction(RETURN, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
         compileRemainingFunctions();

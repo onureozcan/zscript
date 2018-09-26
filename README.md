@@ -15,7 +15,7 @@ it will later be used to provide userspace to zeroscriptOs project.
 
 - [X] static objects and functions 
 
-- [ ] import classes from different folders
+- [X] import classes from different folders
 
 - [ ] throw errors
 

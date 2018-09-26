@@ -28,7 +28,7 @@ z_reg_t *native_strlen(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
 
 z_reg_t *native_object_new(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     return_reg->type = TYPE_OBJ;
-    return_reg->val = (int_t) object_new(NULL);
+    return_reg->val = (int_t) object_new(NULL,NULL);
     return stack;
 }
 
@@ -42,7 +42,7 @@ z_reg_t *native_object_key_list(z_reg_t *stack, z_reg_t *return_reg, z_object_t 
     return_reg->type = TYPE_OBJ;
     z_object_t *ret = (z_object_t *) object->key_list_cache;
     if (!ret) {
-        ret = object_new(NULL);
+        ret = object_new(NULL, NULL);
         arraylist_t *keys = map_key_list(object->properties);
         for (int_t i = 0; i < keys->size; i++) {
             char *value = *(char **) arraylist_get(keys, i);

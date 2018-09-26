@@ -79,6 +79,8 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char 
  */
 void interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_set, z_reg_t *value);
 
+map_t* get_imports_table(z_interpreter_state_t* initial_state);
+
 #include <cmath>
 #include "object.h"
 #include "native_functions.c"
@@ -191,6 +193,7 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
             &&OP_JGE,
             &&OP_JE,
             &&OP_JNE,
+            &&OP_IMPORT
     };
     fsize -= code_start;
     //initialize jump properties
@@ -209,6 +212,15 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
         instruction_ptr = (z_instruction_t *) (byte_stream + initial_state->instruction_pointer);
     }
     GOTO_CURRENT;
+OP_IMPORT:
+    {
+        INIT_R0;
+        INIT_R1;
+        char *import = data + instruction_ptr->r0;
+        char *as = data + instruction_ptr->r1;
+        map_insert(get_imports_table(initial_state), as, &import);
+        GOTO_NEXT;
+    };
 OP_MOV_NUMBER:
     {
         INIT_R0;
@@ -341,7 +353,7 @@ OP_MOD :
         INIT_R1;
         INIT_R2;
         if (r0->type == TYPE_NUMBER) {
-            r2->number_val = fmod( r0->number_val, r1->number_val);//(int_t) r0->number_val % (int_t) r1->number_val;
+            r2->number_val = fmod(r0->number_val, r1->number_val);//(int_t) r0->number_val % (int_t) r1->number_val;
             r2->type = TYPE_NUMBER;
         } else {
             //TODO:operator overloading
@@ -548,7 +560,7 @@ OP_GET_FIELD_IMMEDIATE :
             }
             //not found? maybe a static variable?
             char *class_name = (char *) initial_state->class_name;
-            z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name);
+            z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name,NULL);
             z_reg_t *prop = (z_reg_t *) map_get(type_info->static_variables, field_name_to_get);
             if (prop) {
                 *r2 = *prop;
@@ -565,8 +577,8 @@ OP_GET_FIELD_IMMEDIATE :
                 object_to_search_on = (z_object_t *) r0->val;
                 if (r0->type == TYPE_CLASS_REF) {
                     //static method call
-                    char *class_name = ((z_object_t*)r0->val)->class_ref_object.value;
-                    z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name);
+                    char *class_name = ((z_object_t *) r0->val)->class_ref_object.value;
+                    z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name,get_imports_table(initial_state));
                     z_reg_t *prop = (z_reg_t *) map_get(type_info->static_variables, field_name_to_get);
                     if (prop) {
                         *r2 = *prop;
@@ -593,11 +605,11 @@ OP_GET_FIELD_IMMEDIATE :
                     }
                 }
             }
-            /*the second local variable is this and the second is NULL. in both cases, goto SEARCH_THIS*/
-            else if(r0->number_val == 0 || r0->number_val == 1){
+                /*the second local variable is this and the second is NULL. in both cases, goto SEARCH_THIS*/
+            else if (r0->number_val == 0 || r0->number_val == 1) {
                 goto SEARCH_THIS;
             } else {
-                //TODO
+                //TODO property access on number variables
             }
         }
         GOTO_NEXT;
@@ -639,10 +651,18 @@ OP_SET_FIELD :
         } else if (r0->type != TYPE_NUMBER) {
             if (r0->type != TYPE_INSTANCE) {
                 if (r0->type == TYPE_CLASS_REF) {
-                    char *class_name = ((z_object_t*)r0->val)->class_ref_object.value;
+                    char *class_name = ((z_object_t *) r0->val)->class_ref_object.value;
+                    z_type_info_t *type_info;
                     //static has a special meaning for us
-                    if (strcmp(class_name, "__static__") == 0) class_name = initial_state->class_name;
-                    z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name);
+                    //it means that i am searching for a static variable but a static variable of mine not any other class
+                    if (strcmp(class_name, "__static__") == 0){
+                        class_name = initial_state->class_name;
+                        //since we are searching though our static variables, import table can be null
+                        type_info = object_manager_get_or_load_type_info(class_name,NULL);
+                    } else {
+                        //give function to our current import table so that it can resolve what class to search upon
+                        type_info = object_manager_get_or_load_type_info(class_name,get_imports_table(initial_state));
+                    }
                     map_insert(type_info->static_variables, field_name_to_get, r2);
                 } else {
                     object_to_search_on = (z_object_t *) r0->val;
@@ -698,7 +718,8 @@ OP_CALL :
         } else if (r0->type == TYPE_CLASS_REF) {
             INIT_R1;
             r1->type = TYPE_INSTANCE;
-            r1->val = (int_t) object_new(((z_object_t*)r0->val)->class_ref_object.value);
+            z_type_info_t *type_info = object_manager_get_or_load_type_info(initial_state->class_name,NULL);
+            r1->val = (int_t) object_new(((z_object_t *) r0->val)->class_ref_object.value, type_info->imports_table);
         } else {
             error_and_exit("callee is not a function");
         }
@@ -828,5 +849,13 @@ void interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *fie
         error_and_exit("no such property found ond object");
     }
 }
-
-
+/**
+ * get current imports table.
+ * @param initial_state interpreter state.
+ * @return map_t.
+ */
+Z_INLINE map_t* get_imports_table(z_interpreter_state_t* initial_state){
+    char *class_name = initial_state->class_name;
+    z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name,NULL);
+    return type_info->imports_table;
+}

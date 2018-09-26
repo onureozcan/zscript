@@ -21,16 +21,16 @@ public:
         stmt->stmt = staticConstructor;
     }
 
-    void addStaticVar(Var* var){
-        Statement* stmt = new Statement();
+    void addStaticVar(Var *var) {
+        Statement *stmt = new Statement();
         //static[ident] = value
-        char* ident = var->identifier;
-        BinaryExpression* bop = new BinaryExpression();
+        char *ident = var->identifier;
+        BinaryExpression *bop = new BinaryExpression();
         bop->setOp(".");
         bop->left = TerminalExpression::identifier("__static__");
         bop->right = TerminalExpression::stringWithoutTrim(ident);
 
-        BinaryExpression* assign = new BinaryExpression();
+        BinaryExpression *assign = new BinaryExpression();
         assign->setOp("=");
         assign->left = bop;
         assign->right = var->value;
@@ -82,7 +82,7 @@ public:
         func->setIdentifier(pContext->functionName->IDENT()->getText().data());
         func->body = visitBody(pContext->body(), pKind);
         func->arguments = visitArguments(pContext->argumentsList(), pKind);
-        func->isStatic = pContext->STATIC()!= NULL;
+        func->isStatic = pContext->STATIC() != NULL;
         return func;
     }
 
@@ -123,7 +123,7 @@ public:
     Body *visitBodyOrExpression(zeroscriptParser::ExpressionContext *context, Body *pBody) {
         Body *body = new Body();
         Statement *stmt = new Statement();
-        stmt->stmt = visitExpression(context,body);
+        stmt->stmt = visitExpression(context, body);
         body->statements->push_back(stmt);
         return body;
     }
@@ -136,7 +136,7 @@ public:
             func->body = visitBody(pContext->body(), pKind);
         } else if (pContext->bodyOrExpression()->body()) {
             func->body = visitBody(pContext->bodyOrExpression()->body(), pKind);
-        } else if (pContext->bodyOrExpression()->expression()){
+        } else if (pContext->bodyOrExpression()->expression()) {
             func->body = visitBodyOrExpression(pContext->bodyOrExpression()->expression(), pKind);
         }
         if (pContext->argumentsList()) {
@@ -501,6 +501,14 @@ public:
         cls = new ClassDeclaration();
         cls->body = visitBody(context->body(), NULL);
         cls->setIdentifier(context->identifier().at(0)->getText().data());
+        //hanlde imports
+        for (int_t i = 0; i < context->importStmt().size(); i++) {
+            std::string path = (context->importStmt(i)->STRING()->getText());
+            std::string as = (context->importStmt(i)->IDENT()->getText());
+            cls->importsMap.insert(std::pair<string,string>(
+                    path.substr(1,path.size()-2),as
+            ));
+        }
     }
 
 

@@ -10,7 +10,7 @@ typedef struct z_type_info_t {
     char *bytecode_stream;
     int_t bytecode_size;
     map_t *static_variables;
-    void* saved_state;
+    map_t *imports_table;
 } z_type_info_t;
 
 struct operations {
@@ -49,7 +49,7 @@ typedef struct z_object {
         } class_ref_object;
     };
 } z_object_t;
-Z_INLINE z_object_t *object_new(char *class_name);
+Z_INLINE z_object_t *object_new(char *class_name, map_t* imports_table);
 Z_INLINE z_object_t *string_new(char *data);
 
 #endif //ZEROSCRIPT_OBJECT_H

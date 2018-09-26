@@ -105,7 +105,12 @@ conditional:
     IF '(' expression ')' bodyOrStatement (ELSE bodyOrStatement)?
 ;
 
+importStmt:
+    IMPORT clsPath = STRING AS clsName = IDENT
+    ;
+
 classDeclaration:
+    importStmt*
     CLS className = identifier ('(' argumentsList ')')? (EXTENDS extendedClassName = identifier)? body
  ;
 
@@ -177,6 +182,8 @@ IN                 : 'in';
 CASE               : 'case';
 DEFAULT            : 'default';
 STATIC             : 'static';
+IMPORT             : 'import';
+AS                 : 'as';
 
 // Literals
 INT             : '0'|[1-9][0-9]* ;

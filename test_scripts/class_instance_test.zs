@@ -1,4 +1,3 @@
-
 class ClassInstanceTest()
 {
     print("************ STATIC VARIABLES TEST **********************");
@@ -27,4 +26,6 @@ class ClassInstanceTest()
     helloObject.closureTest()();
     print("fncRef test");
     helloObject.fncRefTest(x => print(x));
+    var a = "test";
+    helloObject.fncRefTest(x => print(a));
 }

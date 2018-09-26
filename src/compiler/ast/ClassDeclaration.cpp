@@ -8,6 +8,8 @@ public:
     char *identifier = NULL;
     ArgumentList *arguments = NULL;
     Body *body = NULL;
+    //imported classes map
+    map<string,string> importsMap = map<string,string>();
 
     void setIdentifier(const char *data) {
         char *temp = (char *) (malloc(sizeof(char) * strlen(data) + 1));

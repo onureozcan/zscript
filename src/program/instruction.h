@@ -88,10 +88,14 @@
 //jump to r2 if r0 != r1
 #define JMP_N_EQUAL 35
 
-//****pseudo instructions****//
-#define COMMENT 36
+//import table builder
+#define IMPORT_CLS 36
 
-#define LABEL 37
+//****pseudo instructions****//
+#define COMMENT 37
+
+#define LABEL 38
+
 
 
 typedef struct z_instruction_t {
@@ -118,8 +122,10 @@ static const char *name_opcode(uint_t opcode);
 void instruction_print(z_instruction_t instruction) {
     if (instruction.opcode >= JMP_LESS && instruction.opcode <= JMP_N_EQUAL) {
         printf("\t%-5s $%-5d $%-5d %-5s ", name_opcode(instruction.opcode), (int) instruction.r0, (int) instruction.r1,
-               (char*) instruction.r2);
-    } else if(instruction.opcode == LABEL) {
+               (char *) instruction.r2);
+    } else if (instruction.opcode == IMPORT_CLS) {
+        printf("\t%s %-5s %-5s:", name_opcode(instruction.opcode), (char *) instruction.r0, (char *) instruction.r1);
+    } else if (instruction.opcode == LABEL) {
         printf("%s %-5s:", name_opcode(instruction.opcode), (char *) instruction.r0);
     } else if (instruction.opcode == COMMENT) {
         printf("\t#%s %-5s", name_opcode(instruction.opcode), (char *) instruction.r0);
@@ -132,7 +138,7 @@ void instruction_print(z_instruction_t instruction) {
                (int) instruction.r1, (int) instruction.r2);
     } else if (instruction.opcode == GET_FIELD_IMMEDIATE) {
         printf("\t%-5s $%-5d %-5s $%-5d", name_opcode(instruction.opcode), (int) instruction.r0,
-               (char*) instruction.r1, (int) instruction.r2);
+               (char *) instruction.r1, (int) instruction.r2);
     } else if (instruction.opcode == RETURN || instruction.opcode == NOP) {
         printf("\t%-5s $%-5d ", name_opcode(instruction.opcode), (int) instruction.r0);
     } else if (instruction.opcode == JMP_TRUE || instruction.opcode == JMP_NOT_TRUE) {
@@ -229,6 +235,8 @@ static const char *name_opcode(uint_t opcode) {
             return "pop";
         case NOP:
             return "nop";
+        case IMPORT_CLS:
+            return "import";
         default:
             return "UNKNOWN";
     }
