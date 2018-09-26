@@ -120,6 +120,14 @@ public:
 
     int counter = 0;
 
+    Body *visitBodyOrExpression(zeroscriptParser::ExpressionContext *context, Body *pBody) {
+        Body *body = new Body();
+        Statement *stmt = new Statement();
+        stmt->stmt = visitExpression(context,body);
+        body->statements->push_back(stmt);
+        return body;
+    }
+
     Expression *visitAnonymousFunction(zeroscriptParser::AnonymousFunctionContext *pContext, Body *pKind) {
         std::string name = "$anonymous_" + std::to_string(++counter);
         Function *func = new Function();
@@ -128,6 +136,8 @@ public:
             func->body = visitBody(pContext->body(), pKind);
         } else if (pContext->bodyOrExpression()->body()) {
             func->body = visitBody(pContext->bodyOrExpression()->body(), pKind);
+        } else if (pContext->bodyOrExpression()->expression()){
+            func->body = visitBodyOrExpression(pContext->bodyOrExpression()->expression(), pKind);
         }
         if (pContext->argumentsList()) {
             func->arguments = visitArguments(pContext->argumentsList(), pKind);
