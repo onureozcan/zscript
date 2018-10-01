@@ -91,11 +91,20 @@
 //import table builder
 #define IMPORT_CLS 36
 
+
+//throw r0
+#define THROW_EXCEPTION 37
+
+//set catch point at r0
+#define SET_CATCH 38
+
+//clear topmost catch point
+#define CLEAR_CATCH 39
+
 //****pseudo instructions****//
-#define COMMENT 37
+#define COMMENT 40
 
-#define LABEL 38
-
+#define LABEL 41
 
 
 typedef struct z_instruction_t {
@@ -120,9 +129,15 @@ z_instruction_t *instruction_new(uint_t opcode, uint_t r0, uint_t r1, uint_t r2)
 static const char *name_opcode(uint_t opcode);
 
 void instruction_print(z_instruction_t instruction) {
-    if (instruction.opcode >= JMP_LESS && instruction.opcode <= JMP_N_EQUAL) {
+    if (instruction.opcode == SET_CATCH) {
+        printf("\t%-5s %-5s", name_opcode(SET_CATCH),(char*)(instruction.r0));
+    } else if (instruction.opcode == CLEAR_CATCH) {
+        printf("\t%-5s", name_opcode(CLEAR_CATCH));
+    } else if (instruction.opcode >= JMP_LESS && instruction.opcode <= JMP_N_EQUAL) {
         printf("\t%-5s $%-5d $%-5d %-5s ", name_opcode(instruction.opcode), (int) instruction.r0, (int) instruction.r1,
                (char *) instruction.r2);
+    } else if (instruction.opcode == THROW_EXCEPTION) {
+        printf("\t%s $%-5d", name_opcode(instruction.opcode), (int) (instruction.r0));
     } else if (instruction.opcode == IMPORT_CLS) {
         printf("\t%s %-5s %-5s:", name_opcode(instruction.opcode), (char *) instruction.r0, (char *) instruction.r1);
     } else if (instruction.opcode == LABEL) {
@@ -159,6 +174,12 @@ void instruction_print(z_instruction_t instruction) {
 
 static const char *name_opcode(uint_t opcode) {
     switch (opcode) {
+        case SET_CATCH:
+            return "set_catch";
+        case CLEAR_CATCH:
+            return "clear_catch";
+        case THROW_EXCEPTION:
+            return "throw";
         case JMP_GREATER_OR_EQUAL:
             return "jge";
         case JMP_GREATER:

@@ -194,6 +194,8 @@ Z_INLINE z_object_t *context_new() {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
     obj->ref_count = 0;
     obj->context_object.symbol_table = NULL;
+    obj->context_object.catches_list = NULL;
+    obj->context_object.catch_context = NULL;
     return obj;
 }
 

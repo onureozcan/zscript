@@ -31,6 +31,7 @@ class ExpressionCompiler {
         if (strcmp(operation, "!=") == 0) return CMP_N_EQUAL;
         if (strcmp(operation, "==") == 0) return CMP_EQUAL;
         if (strcmp(operation, "%") == 0) return MOD;
+        if (strcmp(operation, "throw") == 0) return THROW_EXCEPTION;
     }
 
 public:
@@ -64,6 +65,8 @@ public:
             target = (uint_t) requestedDestinationRegister == -1 ? leftReg : requestedDestinationRegister;
             program->addInstruction(MUL, leftReg, rightReg, target);
             freeRegister(rightReg);
+        } else if (strcmp(pExpression->op,"throw") == 0){
+            program->addInstruction(THROW_EXCEPTION, leftReg, NULL, NULL);
         }
         return target;
     }

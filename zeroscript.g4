@@ -115,11 +115,11 @@ classDeclaration:
  ;
 
 tryCatch:
-    TRY body CATCH '(' argumentsList ')' body
+    TRY body CATCH '(' identifier ')' body (FINALLY body)?
     ;
 
 throw_:
-    THROW newObject
+    THROW expression
     ;
 
 jsonPair:
@@ -177,6 +177,7 @@ CLS                : 'class' ;
 THROW              : 'throw' ;
 TRY                : 'try';
 CATCH              : 'catch';
+FINALLY            : 'finally';
 SWITCH             : 'switch';
 IN                 : 'in';
 CASE               : 'case';

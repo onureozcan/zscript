@@ -437,6 +437,24 @@ public:
 
     }
 
+    Expression *visitThrow(zeroscriptParser::Throw_Context *pContext, Body *pBody) {
+        PrefixExpression *expr = new PrefixExpression();
+        expr->setOp("throw");
+        expr->expr = visitExpression(pContext->expression(), pBody);
+        return expr;
+    }
+
+    AST *visitTryCatch(zeroscriptParser::TryCatchContext *pContext, Body *pBody) {
+        TryCatch *tryCatch = new TryCatch();
+        tryCatch->tryBody = visitBody(pContext->body(0), pBody);
+        tryCatch->catchBody = visitBody(pContext->body(1), pBody);
+        if (pContext->FINALLY()) {
+            tryCatch->finallyBody = visitBody(pContext->body(2), pBody);
+        }
+        tryCatch->catchIdent = visitIdent(pContext->identifier(), pBody);
+        return tryCatch;
+    }
+
     vector<Statement *> *visitStatement(zeroscriptParser::StatementContext *statement, Body *pKind) {
         vector<Statement *> *resultStatements = new vector<Statement *>();
         Statement *stmt = new Statement();
@@ -469,9 +487,9 @@ public:
         } else if (statement->conditional()) {
             stmt->stmt = visitConditional(statement->conditional(), pKind);
         } else if (statement->tryCatch()) {
-            //TODO
+            stmt->stmt = visitTryCatch(statement->tryCatch(), pKind);
         } else if (statement->throw_()) {
-            //TODO
+            stmt->stmt = visitThrow(statement->throw_(), pKind);
         }
         if (resultStatements->size() > 0) {
             stmt = resultStatements->at(0);
@@ -505,8 +523,8 @@ public:
         for (int_t i = 0; i < context->importStmt().size(); i++) {
             std::string path = (context->importStmt(i)->STRING()->getText());
             std::string as = (context->importStmt(i)->IDENT()->getText());
-            cls->importsMap.insert(std::pair<string,string>(
-                    path.substr(1,path.size()-2),as
+            cls->importsMap.insert(std::pair<string, string>(
+                    path.substr(1, path.size() - 2), as
             ));
         }
     }

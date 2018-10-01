@@ -28,10 +28,17 @@ typedef struct z_object {
             z_interpreter_state_t* saved_state;
         } ordinary_object;
         struct {
+            //parent scope
             void *parent_context;
+            //return context
             void *return_context;
+            //we will use it to catch exceptions which are happened inside another class.
+            //if return context is null but catch context is not, than we have an exception thrown inside
+            //someone else's function.
+            void *catch_context;
             void *locals;
             map_t *symbol_table;
+            arraylist_t *catches_list;
             uint_t symbols_address;
             uint_t requested_return_register_index;
             z_instruction_t *return_address;

@@ -54,6 +54,8 @@ typedef struct z_interpreter_state_t {
     void *current_context;
     char *byte_stream;
     char *class_name;
+    char *exception_details;
+    int_t return_code;
     int_t fsize;
     int_t instruction_pointer;
     z_reg_t return_value;
@@ -77,14 +79,18 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char 
  * @param field_name_to_set self explanatory.
  * @param value value of the field.
  */
-void interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_set, z_reg_t *value);
+int_t interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_set, z_reg_t *value);
 
-map_t* get_imports_table(z_interpreter_state_t* initial_state);
+map_t *get_imports_table(z_interpreter_state_t *initial_state);
+
+void interpreter_throw_exception_from_reg(z_interpreter_state_t *current_state, z_reg_t *object_thrown);
+
+void interpreter_throw_exception_from_str(z_interpreter_state_t *current_state, char *message);
 
 #include <cmath>
 #include "object.h"
 #include "native_functions.c"
-#include "object.c";
+#include "object.c"
 
 Z_INLINE char *num_to_str(
 #ifdef FLOAT_SUPPORT
@@ -107,6 +113,9 @@ Z_INLINE char *num_to_str(
     return buff;
 }
 
+#define GOTO_CATCH goto_catch_block(initial_state, byte_stream, &current_context, &instruction_ptr, &locals_ptr); GOTO_CURRENT;
+#define RETURN_IF_ERROR if(initial_state->return_code) return initial_state
+
 Z_INLINE static char *strconcat(const char *s1, const char *s2) {
     uint_t l1 = strlen(s1);
     uint_t l2 = strlen(s2) + 1;
@@ -120,6 +129,12 @@ Z_INLINE static char *strconcat(const char *s1, const char *s2) {
 z_reg_t stack_file[stack_file_size];
 
 z_reg_t *stack_ptr = stack_file;
+
+void goto_catch_block(const z_interpreter_state_t *initial_state,
+                      const char *byte_stream,
+                      z_object_t **current_context_ptr_ptr,
+                      z_instruction_t **instruction_ptr_ptr,
+                      z_reg_t **locals_ptr);
 
 /**
  * heart of the interpreter. interprets a given bytecode.
@@ -193,7 +208,10 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
             &&OP_JGE,
             &&OP_JE,
             &&OP_JNE,
-            &&OP_IMPORT
+            &&OP_IMPORT,
+            &&OP_THROW,
+            &&OP_SET_CATCH,
+            &&OP_CLEAR_CATCH
     };
     fsize -= code_start;
     //initialize jump properties
@@ -211,7 +229,34 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
     } else {
         instruction_ptr = (z_instruction_t *) (byte_stream + initial_state->instruction_pointer);
     }
+    initial_state->return_code = 0;
     GOTO_CURRENT;
+OP_SET_CATCH:
+    {
+
+        arraylist_t *catch_list = current_context->context_object.catches_list;
+        if (!catch_list) {
+            catch_list = arraylist_new(sizeof(int_t));
+            initial_state->current_context = current_context;
+            current_context->context_object.catches_list = catch_list;
+        }
+        arraylist_push(catch_list, (any_ptr_t) &instruction_ptr->r0);
+
+        GOTO_NEXT;
+    };
+OP_CLEAR_CATCH:
+    {
+        arraylist_pop(current_context->context_object.catches_list);
+        GOTO_NEXT;
+    };
+OP_THROW:
+    {
+        INIT_R0;
+        initial_state->current_context = current_context;
+        interpreter_throw_exception_from_reg(initial_state, r0);
+        RETURN_IF_ERROR;
+        GOTO_CATCH;
+    };
 OP_IMPORT:
     {
         INIT_R0;
@@ -560,7 +605,7 @@ OP_GET_FIELD_IMMEDIATE :
             }
             //not found? maybe a static variable?
             char *class_name = (char *) initial_state->class_name;
-            z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name,NULL);
+            z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name, NULL);
             z_reg_t *prop = (z_reg_t *) map_get(type_info->static_variables, field_name_to_get);
             if (prop) {
                 *r2 = *prop;
@@ -578,12 +623,15 @@ OP_GET_FIELD_IMMEDIATE :
                 if (r0->type == TYPE_CLASS_REF) {
                     //static method call
                     char *class_name = ((z_object_t *) r0->val)->class_ref_object.value;
-                    z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name,get_imports_table(initial_state));
+                    z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name,
+                                                                                    get_imports_table(initial_state));
                     z_reg_t *prop = (z_reg_t *) map_get(type_info->static_variables, field_name_to_get);
                     if (prop) {
                         *r2 = *prop;
                     } else {
-                        error_and_exit("cannot read property");
+                        interpreter_throw_exception_from_str(initial_state, "cannot read property");
+                        RETURN_IF_ERROR;
+                        GOTO_CATCH;
                     }
                 } else if (r0->type != TYPE_INSTANCE) {
                     z_reg_t *prop = (z_reg_t *) map_get(object_to_search_on->properties,
@@ -591,7 +639,9 @@ OP_GET_FIELD_IMMEDIATE :
                     if (prop) {
                         *r2 = *prop;
                     } else {
-                        error_and_exit("cannot read property");
+                        interpreter_throw_exception_from_str(initial_state, "cannot read property");
+                        RETURN_IF_ERROR;
+                        GOTO_CATCH;
                     }
                 } else {
                     //get field from an object instance
@@ -601,7 +651,9 @@ OP_GET_FIELD_IMMEDIATE :
                     if (prop) {
                         *r2 = *prop;
                     } else {
-                        error_and_exit("cannot read property");
+                        interpreter_throw_exception_from_str(initial_state, "cannot read property");
+                        RETURN_IF_ERROR;
+                        GOTO_CATCH;
                     }
                 }
             }
@@ -647,7 +699,9 @@ OP_SET_FIELD :
                 }
                 context = (z_object_t *) context->context_object.parent_context;
             }
-            error_and_exit("no such variable found to set");
+            interpreter_throw_exception_from_str(initial_state, "no such variable found to set");
+            RETURN_IF_ERROR;
+            GOTO_CATCH;
         } else if (r0->type != TYPE_NUMBER) {
             if (r0->type != TYPE_INSTANCE) {
                 if (r0->type == TYPE_CLASS_REF) {
@@ -655,13 +709,13 @@ OP_SET_FIELD :
                     z_type_info_t *type_info;
                     //static has a special meaning for us
                     //it means that i am searching for a static variable but a static variable of mine not any other class
-                    if (strcmp(class_name, "__static__") == 0){
+                    if (strcmp(class_name, "__static__") == 0) {
                         class_name = initial_state->class_name;
                         //since we are searching though our static variables, import table can be null
-                        type_info = object_manager_get_or_load_type_info(class_name,NULL);
+                        type_info = object_manager_get_or_load_type_info(class_name, NULL);
                     } else {
                         //give function to our current import table so that it can resolve what class to search upon
-                        type_info = object_manager_get_or_load_type_info(class_name,get_imports_table(initial_state));
+                        type_info = object_manager_get_or_load_type_info(class_name, get_imports_table(initial_state));
                     }
                     map_insert(type_info->static_variables, field_name_to_get, r2);
                 } else {
@@ -674,7 +728,14 @@ OP_SET_FIELD :
                 //set field by using symbol table of this instance
                 object_to_search_on = (z_object_t *) r0->val;
                 z_interpreter_state_t *state = object_to_search_on->ordinary_object.saved_state;
-                interpreter_set_field_virtual(state, field_name_to_get, r2);
+                if(interpreter_set_field_virtual(state, field_name_to_get, r2)){
+                    if(state->return_code){
+                        interpreter_throw_exception_from_str(initial_state,state->exception_details);
+                        RETURN_IF_ERROR;
+                        GOTO_CATCH;
+                    }
+                    GOTO_CATCH;
+                }
             }
         }
         GOTO_NEXT;
@@ -700,6 +761,12 @@ OP_CALL :
                 other_state->instruction_pointer = (function_ref->function_ref_object.start_address);
                 other_state->current_context = called_fnc;
                 z_interpreter_run(other_state);
+                if (other_state->return_code) {
+                    //exception thrown
+                    interpreter_throw_exception_from_str(initial_state, other_state->exception_details);
+                    RETURN_IF_ERROR;
+                    GOTO_CATCH;
+                }
                 INIT_R1;
                 *r1 = other_state->return_value;
                 instruction_ptr++;
@@ -718,10 +785,12 @@ OP_CALL :
         } else if (r0->type == TYPE_CLASS_REF) {
             INIT_R1;
             r1->type = TYPE_INSTANCE;
-            z_type_info_t *type_info = object_manager_get_or_load_type_info(initial_state->class_name,NULL);
+            z_type_info_t *type_info = object_manager_get_or_load_type_info(initial_state->class_name, NULL);
             r1->val = (int_t) object_new(((z_object_t *) r0->val)->class_ref_object.value, type_info->imports_table);
         } else {
-            error_and_exit("callee is not a function");
+            interpreter_throw_exception_from_str(initial_state, "callee is not a function");
+            RETURN_IF_ERROR;
+            GOTO_CATCH;
         }
         GOTO_NEXT;
     };
@@ -746,7 +815,10 @@ OP_RETURN :
         initial_state->current_context = current_context;
         current_context = (z_object_t *) current_context->context_object.return_context;
         initial_state->return_value = *actual_return_reg;
-        if (current_context == NULL) goto end;
+        if (current_context == NULL) {
+            goto end;
+            initial_state->return_code = 0;
+        }
         current_context->ref_count--;
         locals_ptr = (z_reg_t *) current_context->context_object.locals;
         z_reg_t *requested_return_reg = (return_reg + locals_ptr);
@@ -773,6 +845,16 @@ OP_FFRAME :
     }
 end:
     return initial_state;
+}
+
+void goto_catch_block(const z_interpreter_state_t *initial_state,
+                      const char *byte_stream,
+                      z_object_t **current_context_ptr_ptr,
+                      z_instruction_t **instruction_ptr_ptr,
+                      z_reg_t **locals_ptr) {
+    *instruction_ptr_ptr = (z_instruction_t *) (byte_stream + initial_state->instruction_pointer);
+    *current_context_ptr_ptr = (z_object_t *) initial_state->current_context;
+    *locals_ptr = (z_reg_t *) (*current_context_ptr_ptr)->context_object.locals;
 }
 
 /**
@@ -830,8 +912,10 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char 
  * @param saved_state saved state of the object.
  * @param field_name_to_set self explanatory.
  * @param value value of the field.
+ * @returns non zero if threw exception.
  */
-void interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_set, z_reg_t *value) {
+int_t interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_set, z_reg_t *value) {
+    saved_state->return_code = 0;
     z_object_t *context = (z_object_t *) saved_state->current_context;
     map_t *symbol_table = context->context_object.symbol_table;
     if (!symbol_table) {
@@ -846,16 +930,56 @@ void interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *fie
         int_t index = *index_ptr;
         *(((z_reg_t *) context->context_object.locals) + index) = *value;
     } else {
-        error_and_exit("no such property found ond object");
+        interpreter_throw_exception_from_str(saved_state, "no such property found on object");
+        return 1;
     }
+    return 0;
 }
 /**
  * get current imports table.
  * @param initial_state interpreter state.
  * @return map_t.
  */
-Z_INLINE map_t* get_imports_table(z_interpreter_state_t* initial_state){
+Z_INLINE map_t *get_imports_table(z_interpreter_state_t *initial_state) {
     char *class_name = initial_state->class_name;
-    z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name,NULL);
+    z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name, NULL);
     return type_info->imports_table;
+}
+
+void interpreter_throw_exception_from_str(z_interpreter_state_t *current_state, char *message) {
+    //TODO: add function lineage and line numbers
+    z_object_t *context = (z_object_t *) current_state->current_context;
+    while (context != NULL) {
+        arraylist_t *catch_points_list = context->context_object.catches_list;
+        if (catch_points_list && catch_points_list->size > 0) {
+            int_t catch_ptr = *(int_t *) arraylist_pop(catch_points_list);
+            current_state->instruction_pointer = catch_ptr;
+            z_reg_t* exception_info = (z_reg_t*)z_alloc_or_die(sizeof(z_reg_t));
+            exception_info->type = TYPE_STR;
+            z_object_t* exception_info_str = string_new(message);
+            exception_info->val = (uint_t) exception_info_str;
+            *++stack_ptr = *exception_info;
+            return;
+        } else {
+            context = (z_object_t *) context->context_object.return_context;
+            current_state->current_context = context;
+        }
+    }
+    char *detailed_message = NULL;
+    char *class_name = current_state->class_name;
+    int_t length = strlen(message) + strlen(class_name) + 100;
+    detailed_message = (char *) z_alloc_or_die((size_t) length);
+    snprintf(detailed_message, length, "uncaught: %s \nclass:%s", message, class_name);
+    current_state->return_code = 1;
+    current_state->exception_details = detailed_message;
+}
+
+void interpreter_throw_exception_from_reg(z_interpreter_state_t *current_state, z_reg_t *object_thrown) {
+    char *message = NULL;
+    if (object_thrown->type == TYPE_NUMBER) {
+        message = num_to_str(object_thrown->number_val);
+    } else {
+        message = ((z_object_t *) object_thrown->val)->operations.to_string((void *) object_thrown->val);
+    }
+    interpreter_throw_exception_from_str(current_state, message);
 }

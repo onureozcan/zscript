@@ -24,7 +24,7 @@ public :
     static const int AST_KIND_LOOP = 10;
     static const int AST_KIND_VAR = 11;
     static const int AST_KIND_CONDITIONAL = 12;
-    static const int AST_KIND_SWITCH_CASE = 13;
+    static const int AST_KIND_TRY_CATCH = 13;
 
     virtual void print() = 0;
 
@@ -40,6 +40,6 @@ public :
 #include "Conditional.cpp"
 #include "Var.cpp"
 #include "Loop.cpp"
-#include "SwitchCase.cpp"
+#include "TryCatch.cpp"
 
 #endif //ZEROSCRIPT_AST_H

@@ -11,7 +11,7 @@ class Compiler {
     stack<char *> *loopEndLabelsStack = new stack<char *>();
     stack<char *> *loopStartLabelsStack = new stack<char *>();
     vector<char *> *compiledStaticFunctions = new vector<char *>();
-    ClassDeclaration* cls;
+    ClassDeclaration *cls;
     int labelCount = 0;
 
     int getRegister(char *ident) {
@@ -71,8 +71,8 @@ public :
             for (auto elem : cls->importsMap) {
                 char *first = (char *) malloc(strlen(elem.first.c_str()) + 1);
                 char *second = (char *) malloc(strlen(elem.second.c_str()) + 1);
-                strcpy(first,elem.first.c_str());
-                strcpy(second,elem.second.c_str());
+                strcpy(first, elem.first.c_str());
+                strcpy(second, elem.second.c_str());
                 //add import instruction
                 program->addInstruction(IMPORT_CLS, (uint_t) first, (uint_t) second, NULL);
             }
@@ -173,6 +173,24 @@ public :
         freeRegister(valueReg);
     }
 
+    void compileTryCatch(TryCatch *pCatch) {
+        char *catchLabel = (char*)malloc(100);
+        char *finallyLabel = (char*)malloc(100);
+        snprintf(catchLabel,100,".catch_%d",++labelCount);
+        snprintf(finallyLabel,100,".finally_%d",++labelCount);
+        program->addComment("try start");
+        program->addInstruction(SET_CATCH, (uint_t) (catchLabel), 0, 0);
+        compileBody(pCatch->tryBody);
+        program->addComment("end try body");
+        program->addInstruction(JMP, (uint_t)finallyLabel,0,0);
+        program->addLabel(catchLabel);
+        uint_t exceptionInfoRegister = (uint_t) getRegister(pCatch->catchIdent->data);
+        program->addInstruction(POP,exceptionInfoRegister,0,0);
+        compileBody(pCatch->catchBody);
+        program->addLabel(finallyLabel);
+
+    }
+
     void compileStmt(Statement *statement) {
         if (statement->hasBreak) {
             program->addComment("break ");
@@ -192,6 +210,8 @@ public :
             compileBody(dynamic_cast<Body *>(stmt));
         } else if (stmt->kind == AST::AST_KIND_CONDITIONAL) {
             compileConditional(dynamic_cast<Conditional *>(stmt));
+        } else if (stmt->kind == AST::AST_KIND_TRY_CATCH) {
+            compileTryCatch(dynamic_cast<TryCatch *>(stmt));
         } else if (dynamic_cast<Expression *>(stmt)) {
             uint_t reg = compileExpression(dynamic_cast<Expression *>(stmt));
             if (statement->hasReturn) {

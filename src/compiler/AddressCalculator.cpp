@@ -59,6 +59,9 @@ public:
         }
         if (stmt->kind == AST::AST_KIND_VAR) {
             calculateVar(dynamic_cast<Var *>(stmt));
+        } if(stmt->kind == AST::AST_KIND_TRY_CATCH){
+            char* ident = dynamic_cast<TryCatch*>(stmt)->catchIdent->data;
+            addToCurrentTable(ident);
         }
     }
 

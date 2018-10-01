@@ -28,4 +28,17 @@ class ClassInstanceTest()
     helloObject.fncRefTest(x => print(x));
     var a = "test";
     helloObject.fncRefTest(x => print(a));
+    var throwTest = new ThrowTest();
+
+    try {
+        throwTest.throwTest2Inner();
+    } catch(e){
+        print("this time I caught it: "+e);
+    }
+    try {
+        // must throw an exception since there is no property defined on selami
+        helloObject.selami = 10;
+    } catch(e){
+        print("and this too "+e);
+    }
 }

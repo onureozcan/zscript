@@ -74,6 +74,9 @@ int main(int argc, const char *argv[]) {
         initial_state->class_name = class_name;
         interpreter_run_static_constructor(bytes, class_name);
         initial_state = z_interpreter_run(initial_state);
+        if(initial_state->return_code){
+            error_and_exit(initial_state->exception_details);
+        }
         clock_t end = clock();
         double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
         printf("time spent: %lf\n", time_spent);

@@ -30,7 +30,7 @@ class Assembler {
         int_t ip_of_static_const = addData(" ", sizeof(int_t));
         for (int i = 0; i < program->instructions->size; i++) {
             z_instruction_t instruction = *((z_instruction_t *) arraylist_get(program->instructions, i));
-            if (instruction.opcode == IMPORT_CLS) {
+           if (instruction.opcode == IMPORT_CLS) {
                 char* import = (char *) instruction.r0;
                 char* as = (char *) instruction.r1;
                 z_instruction_t *instruction_ptr = ((z_instruction_t *) arraylist_get(program->instructions, i));
@@ -90,23 +90,16 @@ class Assembler {
         for (uint_t i = 0; i < program->instructions->size; i++) {
             z_instruction_t instruction = *((z_instruction_t *) arraylist_get(program->instructions, i));
             if (instruction.opcode != COMMENT && instruction.opcode != LABEL) {
-                //cout << name_opcode(instruction.opcode) << "\n";
                 if (instruction.opcode >= JMP_LESS && instruction.opcode <= JMP_N_EQUAL) {
-//                cout << " GET: `" << (char *) instruction.r2 << "` " << label_position_map[(char *) instruction.r2]
-//                     << "\n";
                     instruction.r2 = label_position_map[(char *) instruction.r2];
                 } else if (instruction.opcode == JMP_NOT_TRUE || instruction.opcode == JMP_TRUE) {
-//                cout << " GET: `" << (char *) instruction.r1 << "` " << label_position_map[(char *) instruction.r1]
-//                     << "\n";
                     instruction.r1 = label_position_map[(char *) instruction.r1];
                 } else if (instruction.opcode == JMP) {
-//                cout << " GET: `" << (char *) instruction.r0 << "` " << label_position_map[(char *) instruction.r0]
-//                     << "\n";
                     instruction.r0 = label_position_map[(char *) instruction.r0];
                 } else if (instruction.opcode == MOV_FNC) {
-//                cout << " GET: `" << (char *) instruction.r1 << "` " << label_position_map[(char *) instruction.r1]
-//                     << "\n";
                     instruction.r1 = label_position_map[(char *) instruction.r1];
+                } else if (instruction.opcode == SET_CATCH) {
+                    instruction.r0 = label_position_map[(char *) instruction.r0];
                 }
                 uint_t opcode = (instruction.opcode);
                 uint_t r0 = (instruction.r0);
