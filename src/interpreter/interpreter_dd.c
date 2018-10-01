@@ -372,6 +372,11 @@ OP_DIV :
         INIT_R1;
         INIT_R2;
         if (r0->type == TYPE_NUMBER) {
+            if(r1->number_val == 0){
+                interpreter_throw_exception_from_str(initial_state,"divide by 0");
+                RETURN_IF_ERROR;
+                GOTO_CATCH;
+            }
             r2->number_val = ((r0->number_val) / (r1->number_val));
             r2->type = TYPE_NUMBER;
         } else {
@@ -952,7 +957,7 @@ void interpreter_throw_exception_from_str(z_interpreter_state_t *current_state, 
     while (context != NULL) {
         arraylist_t *catch_points_list = context->context_object.catches_list;
         if (catch_points_list && catch_points_list->size > 0) {
-            int_t catch_ptr = *(int_t *) arraylist_pop(catch_points_list);
+            int_t catch_ptr = *(int_t *) arraylist_top(catch_points_list);
             current_state->instruction_pointer = catch_ptr;
             z_reg_t* exception_info = (z_reg_t*)z_alloc_or_die(sizeof(z_reg_t));
             exception_info->type = TYPE_STR;

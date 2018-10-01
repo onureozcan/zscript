@@ -188,7 +188,9 @@ public :
         program->addInstruction(POP,exceptionInfoRegister,0,0);
         compileBody(pCatch->catchBody);
         program->addLabel(finallyLabel);
-
+        program->addInstruction(CLEAR_CATCH,0,0,0);
+        if(pCatch->finallyBody)
+        compileBody(pCatch->finallyBody);
     }
 
     void compileStmt(Statement *statement) {

@@ -11,7 +11,7 @@ public:
 
     Body* tryBody;
     Body* catchBody;
-    Body* finallyBody;
+    Body* finallyBody = NULL;
 
     TerminalExpression* catchIdent;
 
