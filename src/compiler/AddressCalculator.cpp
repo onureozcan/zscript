@@ -7,13 +7,13 @@ class AddressCalculator {
 private:
     stack<FunctionKind *> *functionsStack = new stack<FunctionKind *>();
 
-    map<string, int> *getCurrentSymbolTable() {
+    map<string, uint_t> *getCurrentSymbolTable() {
         return functionsStack->top()->symbolTable;
     };
 
     void addToCurrentTable(char *identifier) {
-        int count = getCurrentSymbolTable()->size() + 1;
-        getCurrentSymbolTable()->insert(pair<string, int>(identifier, count));
+        uint_t count = getCurrentSymbolTable()->size() + 1;
+        getCurrentSymbolTable()->insert(pair<string, uint_t>(identifier, count));
     }
 
 public:

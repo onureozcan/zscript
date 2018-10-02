@@ -83,6 +83,7 @@ public:
         func->body = visitBody(pContext->body(), pKind);
         func->arguments = visitArguments(pContext->argumentsList(), pKind);
         func->isStatic = pContext->STATIC() != NULL;
+        func->isAsync = pContext->ASYNC() != NULL;
         return func;
     }
 

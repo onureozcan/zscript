@@ -44,6 +44,7 @@ typedef struct z_object {
         } string_object;
         struct {
             uint_t start_address;
+            uint_t is_async;
             void *parent_context;
             z_interpreter_state_t *responsible_interpreter_state;
         } function_ref_object;

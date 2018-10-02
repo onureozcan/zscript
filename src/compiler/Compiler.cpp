@@ -17,15 +17,15 @@ class Compiler {
     ClassDeclaration *cls;
     int labelCount = 0;
 
-    int getRegister(char *ident) {
+    uint_t getRegister(char *ident) {
         return functionsStack->top()->getRegister(ident);
     }
 
-    void freeRegister(int index) {
+    void freeRegister(uint_t index) {
         functionsStack->top()->freeRegister(index);
     }
 
-    map<string, int> *getCurrentSymbolTable() {
+    map<string, uint_t> *getCurrentSymbolTable() {
         return functionsStack->top()->symbolTable;
     };
     char *bytes = NULL;
@@ -33,10 +33,10 @@ class Compiler {
 public :
     Compiler(ClassDeclaration *ast) {
         this->cls = ast;
-        //ast->print();
         AddressCalculator *addressCalculator = new AddressCalculator(ast);
+       // ast->print();
         compileClass((ast));
-        //program->print();
+       // program->print();
         Assembler assembler;
         bytes = assembler.toBytes(program, &len);
     }
@@ -68,7 +68,7 @@ public :
         }
         program->addComment("mov function ptr to register for %s", func->identifier);
         program->addInstruction(MOV_FNC, (uint_t) getRegister(func->identifier),
-                                (uint64_t) func->identifier, NULL);
+                                (uint64_t) func->identifier, static_cast<uint_t>(func->isAsync));
         if (strcmp(func->identifier, "__static__constructor__") == 0) {
             //if this is the static constructor, add all other static functions and imports to the __static__ variable
             for (auto elem : cls->importsMap) {
@@ -246,7 +246,7 @@ public :
                 Function *func = dynamic_cast<Function *>(stmt);
                 program->addComment("mov function ptr to register for %s", func->identifier);
                 program->addInstruction(MOV_FNC, (uint_t) (getRegister(func->identifier)),
-                                        (uint_t) func->identifier, NULL);
+                                        (uint_t) func->identifier, static_cast<uint_t>(func->isAsync));
             }
 
         }

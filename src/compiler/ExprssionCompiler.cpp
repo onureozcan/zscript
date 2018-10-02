@@ -9,7 +9,7 @@ class ExpressionCompiler {
     FunctionKind *function = NULL;
 
     uint_t getRegister(char *ident) {
-        function->getRegister(ident);
+        return function->getRegister(ident);
     }
 
     void freeRegister(uint_t index) {
@@ -35,9 +35,9 @@ class ExpressionCompiler {
     }
 
 public:
-    uint_t compilePostfix(PostfixExpression *pExpression, int_t requestedDestinationRegister = -1) {
+    uint_t compilePostfix(PostfixExpression *pExpression, uint_t requestedDestinationRegister = 0) {
         uint_t leftReg = (uint_t) compileExpression(pExpression->expr);
-        uint_t target = requestedDestinationRegister == -1 ? getRegister(NULL) : requestedDestinationRegister;
+        uint_t target = requestedDestinationRegister == 0 ? getRegister(NULL) : requestedDestinationRegister;
         program->addInstruction(MOV, target, leftReg, NULL);
         if (strcmp(pExpression->op, "++") == 0) {
             program->addInstruction(INC, leftReg, leftReg, NULL);
@@ -51,18 +51,18 @@ public:
         return target;
     }
 
-    uint_t compilePrefix(PrefixExpression *pExpression, int_t requestedDestinationRegister = -1) {
+    uint_t compilePrefix(PrefixExpression *pExpression, int_t requestedDestinationRegister = 0) {
         uint_t leftReg = (uint_t) compileExpression(pExpression->expr);
         uint_t target = leftReg;
         if (strcmp(pExpression->op, "++") == 0) {
-            target = (uint_t) requestedDestinationRegister == -1 ? leftReg : requestedDestinationRegister;
+            target = (uint_t) requestedDestinationRegister == 0 ? leftReg : requestedDestinationRegister;
             program->addInstruction(INC, leftReg, target, NULL);
         } else if (strcmp(pExpression->op, "--") == 0) {
-            target = (uint_t) requestedDestinationRegister == -1 ? leftReg : requestedDestinationRegister;
+            target = (uint_t) requestedDestinationRegister == 0 ? leftReg : requestedDestinationRegister;
             program->addInstruction(DEC, leftReg, target, NULL);
         } else if (strcmp(pExpression->op, "-") == 0) {
             uint_t rightReg = (uint_t) compileTerminal(TerminalExpression::number("-1"));
-            target = (uint_t) requestedDestinationRegister == -1 ? leftReg : requestedDestinationRegister;
+            target = (uint_t) requestedDestinationRegister == 0 ? leftReg : requestedDestinationRegister;
             program->addInstruction(MUL, leftReg, rightReg, target);
             freeRegister(rightReg);
         } else if (strcmp(pExpression->op,"throw") == 0){
@@ -71,17 +71,17 @@ public:
         return target;
     }
 
-    void compileDotForSetField(BinaryExpression *pExpression, int_t result) {
-        int_t leftReg = compileExpression(pExpression->left);
-        int_t rightReg = compileExpression(pExpression->right);
+    void compileDotForSetField(BinaryExpression *pExpression, uint_t result) {
+        uint_t leftReg = compileExpression(pExpression->left);
+        uint_t rightReg = compileExpression(pExpression->right);
         program->addInstruction(SET_FIELD, leftReg, rightReg, result);
     }
 
-    uint_t compileMethodCall(MethodCall *pMethodCall, int_t destinationRegister = -1) {
+    uint_t compileMethodCall(MethodCall *pMethodCall, uint_t destinationRegister = 0) {
         ExpressionList *argumentsList = pMethodCall->argumentsList;
         vector<Expression *> *expressions = argumentsList->expressions;
-        int_t resultReg = destinationRegister;
-        if (resultReg == -1) resultReg = getRegister(NULL);
+        uint_t resultReg = destinationRegister;
+        if (resultReg == 0) resultReg = getRegister(NULL);
         uint_t exprResultReg = getRegister(NULL);
         for (int_t i = 0; i < expressions->size(); i++) {
             exprResultReg = compileExpression(expressions->at(expressions->size() - 1 - i), exprResultReg);
@@ -97,37 +97,37 @@ public:
         return resultReg;
     }
 
-    int_t compileIdentifier(char *identifier, int_t destinationRegister = -1) {
-        int_t tempRegister = getRegister(identifier);
+    uint_t compileIdentifier(char *identifier, uint_t destinationRegister = 0) {
+        uint_t tempRegister = getRegister(identifier);
         //value not found in the symbol table, virtual lookup
         if (tempRegister == 0) {
-            if (destinationRegister == -1)
+            if (destinationRegister == 0)
                 tempRegister = getRegister(NULL);
             else tempRegister = destinationRegister;
             TerminalExpression *temp = new TerminalExpression();
             temp->type = TerminalExpression::TYPE_STRING;
             temp->data = identifier;
-            int_t str_reg = compileTerminal(temp);
+            uint_t str_reg = compileTerminal(temp);
             program->addInstruction(GET_FIELD, 0, (uint_t) (str_reg),
                                     (uint_t) (tempRegister));
         }
         return tempRegister;
     }
 
-    int_t compileIdentifierImmediate(char *identifier, int_t destinationRegister = -1) {
-        int_t tempRegister = getRegister(identifier);
+    uint_t compileIdentifierImmediate(char *identifier, uint_t destinationRegister = 0) {
+        uint_t tempRegister = getRegister(identifier);
         //value not found in the symbol table, virtual lookup
         if (tempRegister == 0) {
-            if (destinationRegister == -1)
+            if (destinationRegister == 0)
                 tempRegister = getRegister(NULL);
             else tempRegister = destinationRegister;
-            program->addInstruction(GET_FIELD_IMMEDIATE, 0, reinterpret_cast<uint_t>(identifier),
+            program->addInstruction(GET_FIELD_IMMEDIATE, 0, (uint_t)(identifier),
                                     (uint_t) (tempRegister));
         }
         return tempRegister;
     }
 
-    uint_t compileBinary(BinaryExpression *pExpression, int_t destinationRegister = -1) {
+    uint_t compileBinary(BinaryExpression *pExpression, uint_t destinationRegister = 0) {
 
         uint_t leftReg = 0;
         uint_t rightReg = 0;
@@ -169,14 +169,14 @@ public:
         }
 
         leftReg = compileExpression(pExpression->left);
-        int_t requestedDestinationRegister = -1;
+        uint_t requestedDestinationRegister = 0;
         if (isAssignment) {
             requestedDestinationRegister = leftReg;
         }
         if (isDot) rightReg = compileExpression(pExpression->right, requestedDestinationRegister, 1);
         else
             rightReg = compileExpression(pExpression->right, requestedDestinationRegister);
-        if (destinationRegister != -1) {
+        if (destinationRegister != 0) {
             resultReg = destinationRegister;
         } else {
             resultReg = getRegister(NULL);
@@ -192,13 +192,13 @@ public:
         return resultReg;
     }
 
-    int_t compileTerminal(TerminalExpression *right, int_t destionationRegister = -1, int_t has_lookup_object = 0) {
+    uint_t compileTerminal(TerminalExpression *right, uint_t destionationRegister = 0, int_t has_lookup_object = 0) {
         if (right->type == TerminalExpression::TYPE_IDENTIFIER) {
             if (has_lookup_object) compileIdentifier(right->data);
             return compileIdentifierImmediate(right->data);
         }
-        int_t reg = destionationRegister;
-        if (reg == -1) reg = getRegister(NULL);
+        uint_t reg = destionationRegister;
+        if (reg == 0) reg = getRegister(NULL);
         if (right->type == TerminalExpression::TYPE_NUMBER) {
             program->addInstruction(MOV_NUMBER, (uint_t) (reg), (uint_t) right->data,
                                     (uint_t) NULL);
@@ -211,8 +211,8 @@ public:
         }
     }
 
-    uint_t compileExpression(Expression *expr, int_t requestedDestinationRegister = -1, int_t has_lookup_object = 0) {
-        int_t reg;
+    uint_t compileExpression(Expression *expr, uint_t requestedDestinationRegister = 0, int_t has_lookup_object = 0) {
+        uint_t reg;
         if (expr->kind == AST::AST_KIND_METHOD_CALL) {
             return compileMethodCall(dynamic_cast<MethodCall *>(expr),
                                      requestedDestinationRegister);

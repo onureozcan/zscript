@@ -13,7 +13,7 @@ public:
 
     char *identifier;
     Expression *value;
-    bool isStatic;
+    bool isStatic = false;
 
     void setIdentifier(const char *data) {
         char *temp = (char *) (malloc(sizeof(char) * strlen(data) + 1));

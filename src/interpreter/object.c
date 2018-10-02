@@ -7,7 +7,7 @@
 
 #include "object.h"
 
-Z_INLINE z_object_t *string_new(char *data);
+z_object_t *string_new(char *data);
 
 void load_class_code(const char *class_name, char **bytes, size_t *fsize);
 
@@ -198,12 +198,13 @@ Z_INLINE z_object_t *context_new() {
     return obj;
 }
 
-Z_INLINE z_object_t *function_ref_new(uint_t start_addr, void *parent_context, z_interpreter_state_t *state) {
+Z_INLINE z_object_t *function_ref_new(uint_t start_addr, void *parent_context, z_interpreter_state_t *state, uint_t is_async) {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
     obj->ref_count = 0;
     obj->function_ref_object.start_address = start_addr;
     obj->function_ref_object.parent_context = parent_context;
     obj->function_ref_object.responsible_interpreter_state = state;
+    obj->function_ref_object.is_async = is_async;
     obj->operations = object_operations;
     return obj;
 }
@@ -216,7 +217,7 @@ Z_INLINE z_object_t *class_ref_new(char *name) {
     return obj;
 }
 
-Z_INLINE z_object_t *string_new(char *data) {
+z_object_t *string_new(char *data) {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
     obj->ref_count = 0;
     obj->string_object.value = data;
