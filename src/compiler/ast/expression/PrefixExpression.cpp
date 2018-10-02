@@ -21,7 +21,7 @@ public:
     }
 
     void setOp(const char *data) {
-        char *temp = (char *) (malloc(sizeof(char) * strlen(data)));
+        char *temp = (char *) (malloc(sizeof(char) * strlen(data) + 1));
         strcpy(temp, data);
         this->op = temp;
     }

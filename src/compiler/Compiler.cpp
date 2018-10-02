@@ -10,6 +10,9 @@ class Compiler {
     stack<FunctionKind *> *functionsStack = new stack<FunctionKind *>();
     stack<char *> *loopEndLabelsStack = new stack<char *>();
     stack<char *> *loopStartLabelsStack = new stack<char *>();
+    // when a return inside try is encountered, prepend finally body
+    //TODO: crashes if i use vector instead of custom written arraylist. why?
+    arraylist_t *finallyBlocksToPrependReturn = arraylist_new(sizeof(TryCatch));
     vector<char *> *compiledStaticFunctions = new vector<char *>();
     ClassDeclaration *cls;
     int labelCount = 0;
@@ -174,23 +177,28 @@ public :
     }
 
     void compileTryCatch(TryCatch *pCatch) {
-        char *catchLabel = (char*)malloc(100);
-        char *finallyLabel = (char*)malloc(100);
-        snprintf(catchLabel,100,".catch_%d",++labelCount);
-        snprintf(finallyLabel,100,".finally_%d",++labelCount);
+        // push this finally block so that it appears before return
+        if (pCatch->finallyBody)
+            arraylist_push(finallyBlocksToPrependReturn,pCatch);
+        char *catchLabel = (char *) malloc(100);
+        char *finallyLabel = (char *) malloc(100);
+        snprintf(catchLabel, 100, ".catch_%d", ++labelCount);
+        snprintf(finallyLabel, 100, ".finally_%d", ++labelCount);
         program->addComment("try start");
-        program->addInstruction(SET_CATCH, (uint_t) (catchLabel), 0, 0);
+        program->addInstruction(SET_CATCH, (uint_t) (catchLabel), (uint_t) finallyLabel, 0);
         compileBody(pCatch->tryBody);
         program->addComment("end try body");
-        program->addInstruction(JMP, (uint_t)finallyLabel,0,0);
+        program->addInstruction(JMP, (uint_t) finallyLabel, 0, 0);
         program->addLabel(catchLabel);
         uint_t exceptionInfoRegister = (uint_t) getRegister(pCatch->catchIdent->data);
-        program->addInstruction(POP,exceptionInfoRegister,0,0);
+        program->addInstruction(POP, exceptionInfoRegister, 0, 0);
         compileBody(pCatch->catchBody);
         program->addLabel(finallyLabel);
-        program->addInstruction(CLEAR_CATCH,0,0,0);
-        if(pCatch->finallyBody)
-        compileBody(pCatch->finallyBody);
+        if (pCatch->finallyBody)
+            compileBody(pCatch->finallyBody);
+        program->addInstruction(CLEAR_CATCH, 0, 0, 0);
+        if (pCatch->finallyBody)
+            arraylist_pop(finallyBlocksToPrependReturn);
     }
 
     void compileStmt(Statement *statement) {
@@ -217,6 +225,11 @@ public :
         } else if (dynamic_cast<Expression *>(stmt)) {
             uint_t reg = compileExpression(dynamic_cast<Expression *>(stmt));
             if (statement->hasReturn) {
+                //this loop compiler every finally block in the lexical scope before return statement appears.
+                program->addComment(" prepend finally blocks", reg);
+                for(int_t i=0;i< finallyBlocksToPrependReturn->size;i++){
+                    compileBody(((TryCatch*)arraylist_get(finallyBlocksToPrependReturn,i))->finallyBody);
+                }
                 program->addComment(" return %d", reg);
                 program->addInstruction(RETURN, reg, (uint_t) NULL, (uint_t) NULL);
             }

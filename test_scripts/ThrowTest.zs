@@ -9,6 +9,7 @@ class ThrowTest(){
     throwTest3();
 
     function throwTest0(){
+        print("this tests runtime errors");
         try {
             10/0;
         }catch(e){
@@ -17,6 +18,7 @@ class ThrowTest(){
     }
 
     function throwTest1(){
+        print("this tests catching thrown errors");
         try {
             throw "what happened?";
         } catch(e) {
@@ -26,6 +28,7 @@ class ThrowTest(){
     }
 
     function throwTest2(){
+        print("this tests catching thrown errors inside another function");
         try {
             throwTest2Inner();
         } catch(e){
@@ -39,9 +42,9 @@ class ThrowTest(){
     }
 
     function throwTest3(){
-        print("throw test 3 ..");
+        print("this tests finally block");
         try {
-
+            return 0;
         } catch (e){
             print("something happened");
         } finally {

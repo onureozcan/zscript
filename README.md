@@ -17,9 +17,9 @@ it will later be used to provide userspace to zeroscriptOs project.
 
 - [X] import classes from different folders
 
-- [ ] throw errors
+- [X] throw errors
 
-- [ ] try/catch
+- [X] try/catch
 
 - [ ] access modifiers
 
@@ -58,7 +58,7 @@ class Hello(/*constructor arguments*/){
     function setHelloMessage(message){
 
         // notice that this refers to the class itself
-        helloMessage = message;
+        this.helloMessage = message;
 
     }
 

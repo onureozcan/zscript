@@ -372,8 +372,8 @@ OP_DIV :
         INIT_R1;
         INIT_R2;
         if (r0->type == TYPE_NUMBER) {
-            if(r1->number_val == 0){
-                interpreter_throw_exception_from_str(initial_state,"divide by 0");
+            if (r1->number_val == 0) {
+                interpreter_throw_exception_from_str(initial_state, "divide by 0");
                 RETURN_IF_ERROR;
                 GOTO_CATCH;
             }
@@ -733,9 +733,9 @@ OP_SET_FIELD :
                 //set field by using symbol table of this instance
                 object_to_search_on = (z_object_t *) r0->val;
                 z_interpreter_state_t *state = object_to_search_on->ordinary_object.saved_state;
-                if(interpreter_set_field_virtual(state, field_name_to_get, r2)){
-                    if(state->return_code){
-                        interpreter_throw_exception_from_str(initial_state,state->exception_details);
+                if (interpreter_set_field_virtual(state, field_name_to_get, r2)) {
+                    if (state->return_code) {
+                        interpreter_throw_exception_from_str(initial_state, state->exception_details);
                         RETURN_IF_ERROR;
                         GOTO_CATCH;
                     }
@@ -959,9 +959,9 @@ void interpreter_throw_exception_from_str(z_interpreter_state_t *current_state, 
         if (catch_points_list && catch_points_list->size > 0) {
             int_t catch_ptr = *(int_t *) arraylist_top(catch_points_list);
             current_state->instruction_pointer = catch_ptr;
-            z_reg_t* exception_info = (z_reg_t*)z_alloc_or_die(sizeof(z_reg_t));
+            z_reg_t *exception_info = (z_reg_t *) z_alloc_or_die(sizeof(z_reg_t));
             exception_info->type = TYPE_STR;
-            z_object_t* exception_info_str = string_new(message);
+            z_object_t *exception_info_str = string_new(message);
             exception_info->val = (uint_t) exception_info_str;
             *++stack_ptr = *exception_info;
             return;
