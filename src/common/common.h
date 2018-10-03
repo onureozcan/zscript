@@ -10,6 +10,8 @@
 #define Z_REALLOC realloc
 #define Z_FREE free
 #define FLOAT_SUPPORT
+#define TRUE 1
+#define FALSE 0
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -22,5 +24,7 @@
 
 #include "data_structures/arraylist.c"
 #include "data_structures/map.c"
+
+arraylist_t* threads;
 
 #endif //ZEROSCRIPT_COMMON_H

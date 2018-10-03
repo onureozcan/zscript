@@ -72,14 +72,23 @@ int main(int argc, const char *argv[]) {
         class_name[strlen(filename) - 3] = 0;
         object_manager_register_object_type(class_name, bytes, len);
         initial_state->class_name = class_name;
+        initial_state->is_async = FALSE;
+        initial_state->stack_ptr = NULL;
         interpreter_run_static_constructor(bytes, class_name);
         initial_state = z_interpreter_run(initial_state);
-        if(initial_state->return_code){
+        if (initial_state->return_code) {
             error_and_exit(initial_state->exception_details);
         }
         clock_t end = clock();
         double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
         printf("time spent: %lf\n", time_spent);
+        if (threads) {
+            for (int_t i = 0; i < threads->size; i++) {
+                pthread_t th = **(pthread_t**)arraylist_get(threads,i);
+                pthread_join(th,NULL);
+            }
+        }
+        printf("total allocated:%ld mb\n", total_allocated / (1024 * 1024));
     } else {
         FILE *ofile = fopen(oFilename, "wb");
         fwrite(bytes, static_cast<size_t>(len), 1, ofile);

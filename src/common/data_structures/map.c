@@ -1,8 +1,8 @@
 //
 // Created by onur on 05.06.2018.
 //
-
-#define MAP_BAG_SIZE 100
+// TODO : dynamically increase and decrease size
+#define MAP_BAG_SIZE 10
 
 #define MAP_FLAG_ENUMERABLE 1
 

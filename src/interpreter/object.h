@@ -6,7 +6,6 @@
 #define ZEROSCRIPT_OBJECT_H
 
 typedef struct z_type_info_t {
-    char *class_name;
     char *bytecode_stream;
     int_t bytecode_size;
     map_t *static_variables;
@@ -53,6 +52,9 @@ typedef struct z_object {
         } class_ref_object;
     };
 } z_object_t;
+
+map_t* string_native_properties_map = 0;
+
 Z_INLINE z_object_t *object_new(char *class_name, map_t* imports_table);
 Z_INLINE z_object_t *string_new(char *data);
 

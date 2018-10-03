@@ -10,10 +10,13 @@ any_ptr_t z_realloc_or_die(any_ptr_t old_ptr,size_t size) {
     return ptr;
 }
 
+uint_t total_allocated = 0;
+
 Z_INLINE any_ptr_t z_alloc_or_die(size_t size) {
     any_ptr_t ptr = Z_MALLOC(size);
     if (ptr == NULL) {
         err_out_of_memory();
     }
+    total_allocated += size;
     return ptr;
 }

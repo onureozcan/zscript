@@ -27,7 +27,7 @@ it will later be used to provide userspace to zeroscriptOs project.
 
 - [ ] garbage collector
 
-- [ ] asynchronous functions
+- [X] asynchronous functions
 
 - [ ] packaging of compiled bytecode into .zar files
 

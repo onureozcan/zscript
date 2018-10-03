@@ -59,6 +59,8 @@ typedef struct z_interpreter_state_t {
     int_t fsize;
     int_t instruction_pointer;
     z_reg_t return_value;
+    z_reg_t *stack_ptr;
+    uint_t is_async;
 } z_interpreter_state_t;
 
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state);
@@ -114,7 +116,7 @@ Z_INLINE char *num_to_str(
 }
 
 #define GOTO_CATCH goto_catch_block(initial_state, byte_stream, &current_context, &instruction_ptr, &locals_ptr); GOTO_CURRENT;
-#define RETURN_IF_ERROR if(initial_state->return_code) return initial_state
+#define RETURN_IF_ERROR if(initial_state->return_code) goto end;
 
 Z_INLINE static char *strconcat(const char *s1, const char *s2) {
     uint_t l1 = strlen(s1);
@@ -131,9 +133,6 @@ typedef struct z_async_fnc_args_t {
 } z_async_fnc_args_t;
 
 #define stack_file_size 1000
-z_reg_t stack_file[stack_file_size];
-
-z_reg_t *stack_ptr = stack_file;
 
 void goto_catch_block(const z_interpreter_state_t *initial_state,
                       const char *byte_stream,
@@ -141,7 +140,9 @@ void goto_catch_block(const z_interpreter_state_t *initial_state,
                       z_instruction_t **instruction_ptr_ptr,
                       z_reg_t **locals_ptr);
 
-void* run_async_inner(void*);
+void *run_async_inner(void *);
+
+void *run_async(void *argsv);
 
 /**
  * heart of the interpreter. interprets a given bytecode.
@@ -152,6 +153,11 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
 
     char *byte_stream = initial_state->byte_stream;
     int_t fsize = initial_state->fsize;
+    int_t release_stack_on_end = initial_state->stack_ptr == NULL;
+    z_reg_t* stack_start = (z_reg_t *) z_alloc_or_die(stack_file_size * sizeof(z_reg_t));;
+    if (release_stack_on_end) {
+        initial_state->stack_ptr = (z_reg_t *) z_alloc_or_die(stack_file_size * sizeof(z_reg_t));
+    }
 
     z_object_t *current_context = (z_object_t *) initial_state->current_context;
 
@@ -759,7 +765,7 @@ OP_CALL :
             //call native function
             native_fnc_t *native_fnc = (native_fnc_t *) r0->val;
             INIT_R1;
-            stack_ptr = native_fnc->fnc(stack_ptr, r1, object_to_search_on);
+            initial_state->stack_ptr = native_fnc->fnc(initial_state->stack_ptr, r1, object_to_search_on);
         } else if (r0->type == TYPE_FUNCTION_REF) {
             z_object_t *function_ref = (z_object_t *) r0->val;
             //someone else's function...
@@ -771,6 +777,7 @@ OP_CALL :
                 called_fnc->context_object.return_address = NULL;
                 called_fnc->context_object.requested_return_register_index = instruction_ptr->r1;
                 other_state->instruction_pointer = (function_ref->function_ref_object.start_address);
+                other_state->stack_ptr = initial_state->stack_ptr;
                 other_state->current_context = called_fnc;
                 z_interpreter_run(other_state);
                 if (other_state->return_code) {
@@ -784,9 +791,11 @@ OP_CALL :
                 instruction_ptr++;
             } else {
                 if (function_ref->function_ref_object.is_async) {
-                    pthread_t *thread = (pthread_t *) z_alloc_or_die(sizeof(pthread_t));
-                    z_async_fnc_args_t args = {initial_state, function_ref};
-                    pthread_create(thread,NULL,run_async_inner,&args);
+                    z_async_fnc_args_t *args = (z_async_fnc_args_t *) z_alloc_or_die(
+                            sizeof(z_async_fnc_args_t));
+                    args->initial_state = initial_state;
+                    args->function_ref = function_ref;
+                    run_async((void *) args);
                     GOTO_NEXT;
                 } else {
                     //our function
@@ -817,13 +826,13 @@ OP_CALL :
 OP_PUSH:
     {
         INIT_R0;
-        *(++stack_ptr) = *r0;
+        *(++initial_state->stack_ptr) = *r0;
         GOTO_NEXT
     };
 OP_POP :
     {
         INIT_R0;
-        *r0 = *(stack_ptr--);
+        *r0 = *(initial_state->stack_ptr--);
         GOTO_NEXT
     };
 OP_RETURN :
@@ -864,15 +873,29 @@ OP_FFRAME :
         GOTO_NEXT;
     }
 end:
+    if (release_stack_on_end) {
+        Z_FREE(stack_start);
+    }
     return initial_state;
 }
 
-void* run_async_inner(void *argsv) {
-    z_async_fnc_args_t *args = (z_async_fnc_args_t*) argsv;
+void *run_async(void *argsv) {
+    if (threads == NULL) {
+        threads = arraylist_new(sizeof(pthread_t *));
+    }
+    pthread_t *thread = (pthread_t *) z_alloc_or_die(sizeof(pthread_t));
+    pthread_create(thread, NULL, run_async_inner, argsv);
+    arraylist_push(threads, thread);
+}
+
+void *run_async_inner(void *argsv) {
+    z_async_fnc_args_t *args = (z_async_fnc_args_t *) argsv;
     z_interpreter_state_t *initial_state = args->initial_state;
     z_object_t *function_ref = args->function_ref;
-    z_interpreter_state_t *other_state = (z_interpreter_state_t*)z_alloc_or_die(sizeof(z_interpreter_state_t));
+    z_interpreter_state_t *other_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
     other_state->return_code = 0;
+    other_state->is_async = TRUE;
+    other_state->stack_ptr = NULL;
     other_state->exception_details = NULL;
     other_state->class_name = initial_state->class_name;
     other_state->byte_stream = initial_state->byte_stream;
@@ -884,6 +907,10 @@ void* run_async_inner(void *argsv) {
     other_state->instruction_pointer = (function_ref->function_ref_object.start_address);
     other_state->current_context = called_fnc;
     z_interpreter_run(other_state);
+    Z_FREE(argsv);
+    if (other_state->return_code != 0) {
+        error_and_exit(other_state->exception_details);
+    }
     return NULL;
 }
 
@@ -905,10 +932,13 @@ void interpreter_run_static_constructor(char *bytes, char *class_name) {
     int_t *static_block_ptr_ptr = (int_t *) (bytes + sizeof(int_t));
     int_t static_block_ptr = *static_block_ptr_ptr;
     z_interpreter_state_t *temp_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
+    temp_state->is_async = FALSE;
     temp_state->byte_stream = bytes;
     z_object_t *context = context_new();;
     temp_state->current_context = context;
     temp_state->class_name = class_name;
+    z_reg_t* temp_stack = (z_reg_t*)(z_alloc_or_die(stack_file_size*sizeof(z_reg_t)));
+    temp_state->stack_ptr = temp_stack;
     temp_state->instruction_pointer = static_block_ptr;
     z_object_t *called_fnc = context_new();
     called_fnc->context_object.parent_context = NULL;
@@ -917,6 +947,7 @@ void interpreter_run_static_constructor(char *bytes, char *class_name) {
     called_fnc->context_object.requested_return_register_index = 0;
     temp_state->current_context = called_fnc;
     z_interpreter_run(temp_state);
+    Z_FREE(temp_stack);
 }
 
 /**
@@ -998,7 +1029,7 @@ void interpreter_throw_exception_from_str(z_interpreter_state_t *current_state, 
             exception_info->type = TYPE_STR;
             z_object_t *exception_info_str = string_new(message);
             exception_info->val = (uint_t) exception_info_str;
-            *++stack_ptr = *exception_info;
+            *++current_state->stack_ptr = *exception_info;
             return;
         } else {
             context = (z_object_t *) context->context_object.return_context;

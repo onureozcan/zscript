@@ -51,10 +51,18 @@ void object_manager_init(char *cp) {
     if (cp == NULL) {
         class_path = ".";
     }
+
     known_types_map = map_new(sizeof(z_type_info_t));
     native_strlen_wrapper = wrap_native_fnc(native_strlen);
     native_keysize_wrapper = wrap_native_fnc(native_object_key_size);
     native_keylist_wrapper = wrap_native_fnc(native_object_key_list);
+
+    //native string properties
+    string_native_properties_map = map_new(sizeof(z_reg_t));
+    z_reg_t temp;
+    temp.type = TYPE_NATIVE_FUNC;
+    temp.val = (int_t) native_strlen_wrapper;
+    map_insert_non_enumerable(string_native_properties_map, "length", &temp);
 }
 
 /**
@@ -95,7 +103,6 @@ char *resolveImportedClassName(char *class_name, map_t *imports_table) {
  */
 void object_manager_register_object_type(char *class_name, char *bytecodes, int_t size) {
     z_type_info_t *type_info = (z_type_info_t *) (z_alloc_or_die(sizeof(z_type_info_t)));
-    type_info->class_name = class_name;
     type_info->bytecode_stream = bytecodes;
     type_info->bytecode_size = size;
     type_info->static_variables = map_new(sizeof(z_reg_t));
@@ -217,16 +224,13 @@ Z_INLINE z_object_t *class_ref_new(char *name) {
     return obj;
 }
 
+
 z_object_t *string_new(char *data) {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
     obj->ref_count = 0;
     obj->string_object.value = data;
     obj->operations = string_operations;
-    obj->properties = map_new(sizeof(z_reg_t));
-    z_reg_t temp;
-    temp.type = TYPE_NATIVE_FUNC;
-    temp.val = (int_t) native_strlen_wrapper;
-    map_insert_non_enumerable(obj->properties, "length", &temp);
+    obj->properties = string_native_properties_map;
     return obj;
 }
 
