@@ -85,6 +85,7 @@ public:
         func->arguments = visitArguments(pContext->argumentsList(), pKind);
         func->isStatic = pContext->STATIC() != NULL;
         func->isAsync = pContext->ASYNC() != NULL;
+        func->isPrivate = pContext->PRIVATE() != NULL;
         return func;
     }
 

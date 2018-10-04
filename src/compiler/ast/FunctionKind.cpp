@@ -11,6 +11,7 @@ public:
     vector<AST *> *functionsToCompile = new vector<AST *>();
     int_t isStatic = false;
     int_t isAsync = false;
+    int_t isPrivate = false;
 
     void freeRegister(uint_t index) {
         if (index > symbolTable->size()) {

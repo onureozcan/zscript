@@ -31,6 +31,8 @@ public:
 
     void calculateFunction(Function *func) {
         addToCurrentTable(func->identifier);
+        if(func->isPrivate)
+            addToCurrentPrivatesMap(func->identifier);
         functionsStack->push(func);
         addToCurrentTable(const_cast<char *>("this"));
         addToCurrentTable(func->identifier);

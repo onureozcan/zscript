@@ -51,4 +51,12 @@ class ClassInstanceTest()
     } catch(e) {
         print(e);
     }
+
+    try {
+        print(objectWithPrivateVariables.privateFnc());
+    } catch(e) {
+        print(e);
+    }
+
+    objectWithPrivateVariables.getPrivateFnc()();
 }

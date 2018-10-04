@@ -78,7 +78,7 @@ anonymousFunction:
     ;
 
 function:
-    STATIC? ASYNC? FUNC? functionName = identifier '(' argumentsList ')' body
+    PRIVATE? STATIC? ASYNC? FUNC? functionName = identifier '(' argumentsList ')' body
     ;
 
 var:
