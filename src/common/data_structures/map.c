@@ -3,8 +3,10 @@
 //
 // TODO : dynamically increase and decrease size
 #define MAP_BAG_SIZE 10
-
+//2^0
 #define MAP_FLAG_ENUMERABLE 1
+//2^1
+#define MAP_FLAG_PRIVATE 2
 
 typedef struct map_t {
     uint_t size;
@@ -15,7 +17,9 @@ typedef struct map_t {
     arraylist_t *flags[MAP_BAG_SIZE];
 } map_t;
 
-static void map_insert_internal(map_t *self, char *key, any_ptr_t value, int_t is_enumerable);
+void map_insert_flags(map_t *self, char *key, any_ptr_t value, int_t is_enumerable);
+
+any_ptr_t map_get_flags(map_t *self, char *key, int_t* flags) ;
 
 Z_INLINE static uint_t get_hash(char *value) {
     uint_t hash = 0;
@@ -32,24 +36,21 @@ map_t *map_new(uint_t siz_of_an_item) {
     for (int i = 0; i < MAP_BAG_SIZE; i++) {
         self->keys[i] = NULL;
         self->values[i] = NULL;
+        self->flags[i] = NULL;
     }
     return self;
 }
 
 void map_insert(map_t *self, char *key, any_ptr_t value) {
-    map_insert_internal(self, key, value, 1);
+    map_insert_flags(self, key, value, 0|MAP_FLAG_ENUMERABLE);
 }
 
 void map_insert_non_enumerable(map_t *self, char *key, any_ptr_t value) {
-    map_insert_internal(self, key, value, 0);
+    map_insert_flags(self, key, value, 0);
 }
 
-static void map_insert_internal(map_t *self, char *key, any_ptr_t value, int_t is_enumerable) {
+void map_insert_flags(map_t *self, char *key, any_ptr_t value, int_t flag) {
     if (self->is_immutable) return;
-    int_t flag = 0;
-    if (is_enumerable) {
-        flag |= MAP_FLAG_ENUMERABLE;
-    }
     uint_t hash = get_hash(key);
     arraylist_t *vbag = self->values[hash];
     arraylist_t *kbag = self->keys[hash];
@@ -69,24 +70,31 @@ static void map_insert_internal(map_t *self, char *key, any_ptr_t value, int_t i
             return;
         }
     }
-    self->size += is_enumerable;
+    self->size += flag & MAP_FLAG_ENUMERABLE;
     arraylist_push(kbag, &key);
     arraylist_push(vbag, value);
     arraylist_push(flags, &flag);
 }
 
 Z_INLINE any_ptr_t map_get(map_t *self, char *key) {
-    uint_t hash = get_hash(key);
-    arraylist_t *kbag = self->keys[hash];
-    arraylist_t *vbag = self->values[hash];
-    if (kbag) {
-        for (uint_t i = 0; i < kbag->size; i++) {
-            if (strcmp(*(char **) arraylist_get(kbag, i), key) == 0) {
-                return arraylist_get(vbag, i);
+    return map_get_flags(self,key,NULL);
+}
+
+Z_INLINE any_ptr_t map_get_flags(map_t *self, char *key, int_t* flags) {
+        uint_t hash = get_hash(key);
+        arraylist_t *kbag = self->keys[hash];
+        arraylist_t *vbag = self->values[hash];
+        if (kbag) {
+            for (uint_t i = 0; i < kbag->size; i++) {
+                if (strcmp(*(char **) arraylist_get(kbag, i), key) == 0) {
+                    if(flags){
+                        *flags = *((int *) arraylist_get(self->flags[hash], i));
+                    }
+                    return arraylist_get(vbag, i);
+                }
             }
         }
-    }
-    return NULL;
+        return NULL;
 }
 
 arraylist_t *map_key_list(map_t *self) {

@@ -122,8 +122,7 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
 Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table) {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
     obj->properties = map_new(sizeof(z_reg_t));
-    obj->key_list_cache;
-    obj->ref_count = 0;
+    obj->key_list_cache = NULL;
     if (class_name) {
         class_name = resolveImportedClassName(class_name, imports_table);
         z_type_info_t *object_type_info = (z_type_info_t *) map_get(known_types_map, class_name);
@@ -142,6 +141,7 @@ Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table) {
         initial_state->current_context = NULL;
         initial_state->instruction_pointer = NULL;
         initial_state->class_name = class_name;
+        initial_state->stack_ptr = NULL;
         obj->ordinary_object.saved_state = z_interpreter_run(initial_state);
         return obj;
     }
@@ -199,7 +199,6 @@ void load_class_code(const char *class_name, char **bytes, size_t *fsize) {
  */
 Z_INLINE z_object_t *context_new() {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
-    obj->ref_count = 0;
     obj->context_object.symbol_table = NULL;
     obj->context_object.catches_list = NULL;
     return obj;
@@ -207,7 +206,6 @@ Z_INLINE z_object_t *context_new() {
 
 Z_INLINE z_object_t *function_ref_new(uint_t start_addr, void *parent_context, z_interpreter_state_t *state, uint_t is_async) {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
-    obj->ref_count = 0;
     obj->function_ref_object.start_address = start_addr;
     obj->function_ref_object.parent_context = parent_context;
     obj->function_ref_object.responsible_interpreter_state = state;
@@ -218,7 +216,6 @@ Z_INLINE z_object_t *function_ref_new(uint_t start_addr, void *parent_context, z
 
 Z_INLINE z_object_t *class_ref_new(char *name) {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
-    obj->ref_count = 0;
     obj->class_ref_object.value = name;
     obj->operations = object_operations;
     return obj;
@@ -227,7 +224,6 @@ Z_INLINE z_object_t *class_ref_new(char *name) {
 
 z_object_t *string_new(char *data) {
     z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
-    obj->ref_count = 0;
     obj->string_object.value = data;
     obj->operations = string_operations;
     obj->properties = string_native_properties_map;
@@ -242,8 +238,14 @@ map_t *build_symbol_table(const char *data) {
     for (int_t i = 0; i < size; i++) {
         int_t value = i + 1;
         char *item = (char *) (data + pos);
-        pos += strlen(item) + 1;
-        map_insert(symbol_table, item, &value);
+        uint_t size_of_item = strlen(item);
+        pos += size_of_item + 2; //1 for isPrivate
+        char is_private = *(char *) (data + pos -1);
+        int_t flag = 0| MAP_FLAG_ENUMERABLE;
+        if(is_private){
+            flag |= MAP_FLAG_PRIVATE;
+        }
+        map_insert_flags(symbol_table, item, &value, flag);
     }
     return symbol_table;
 }

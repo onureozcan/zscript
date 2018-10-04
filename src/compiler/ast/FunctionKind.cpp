@@ -6,6 +6,7 @@ class FunctionKind : public Expression {
 
 public:
     map<string, uint_t> *symbolTable = new map<string, uint_t>();
+    map<string, uint_t> *privatesTable = new map<string, uint_t>();
     map<uint_t, bool> *registerTable = new map<uint_t, bool>();
     vector<AST *> *functionsToCompile = new vector<AST *>();
     int_t isStatic = false;

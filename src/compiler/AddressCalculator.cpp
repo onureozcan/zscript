@@ -11,6 +11,14 @@ private:
         return functionsStack->top()->symbolTable;
     };
 
+    map<string, uint_t> *getCurrentPrivatesTable() {
+        return functionsStack->top()->privatesTable;
+    };
+
+    void addToCurrentPrivatesMap(char* identifier){
+        getCurrentPrivatesTable()->insert(pair<string, uint_t>(identifier, TRUE));
+    }
+
     void addToCurrentTable(char *identifier) {
         uint_t count = getCurrentSymbolTable()->size() + 1;
         getCurrentSymbolTable()->insert(pair<string, uint_t>(identifier, count));
@@ -80,8 +88,11 @@ public:
     }
 
     void calculateVar(Var *var) {
-        if (!var->isStatic)
+        if (!var->isStatic){
             addToCurrentTable(var->identifier);
+            if(var->isPrivate)
+                addToCurrentPrivatesMap(var->identifier);
+        }
     }
 
 };

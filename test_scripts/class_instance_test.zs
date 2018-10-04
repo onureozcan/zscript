@@ -28,6 +28,7 @@ class ClassInstanceTest()
     helloObject.fncRefTest(x => print(x));
     var a = "test";
     helloObject.fncRefTest(x => print(a));
+    print("************ CATCH EXCEPTIONS INSIDE ANOTHER CLASSS TEST **********************");
     var throwTest = new ThrowTest();
 
     try {
@@ -40,5 +41,14 @@ class ClassInstanceTest()
         helloObject.selami = 10;
     } catch(e){
         print("and this too "+e);
+    }
+
+    print("************ PRIVATE VARIABLES TEST **********************");
+
+    var objectWithPrivateVariables = new PrivateVariablesTest();
+    try {
+        print(objectWithPrivateVariables.privateVariable);
+    } catch(e) {
+        print(e);
     }
 }

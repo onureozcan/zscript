@@ -17,7 +17,6 @@ struct operations {
 };
 
 typedef struct z_object {
-    int_t ref_count;
     map_t *properties;
     void* key_list_cache;
     struct operations operations;

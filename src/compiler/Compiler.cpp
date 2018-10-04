@@ -34,7 +34,7 @@ public :
     Compiler(ClassDeclaration *ast) {
         this->cls = ast;
         AddressCalculator *addressCalculator = new AddressCalculator(ast);
-       // ast->print();
+        // ast->print();
         compileClass((ast));
        // program->print();
         Assembler assembler;
@@ -277,9 +277,13 @@ public :
         program->addInstruction(RETURN, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
         compileRemainingFunctions();
         uint_t locals_count = cls->registerTable->size() + cls->symbolTable->size();
+        z_instruction_t* fframe = (z_instruction_t *) arraylist_get(program->instructions, index);
         //set args of FFRAME
-        ((z_instruction_t *) arraylist_get(program->instructions, index))->r0 = locals_count;
-        ((z_instruction_t *) arraylist_get(program->instructions, index))->r1 = (uint_t) (cls->symbolTable);
+        fframe->r0 = locals_count;
+        //this will later be used to assemble required information
+        fframe->r1 = (uint_t) (cls->symbolTable);
+        //this will later be used to assemble required information
+        fframe->r2 = (uint_t) (cls->privatesTable);
         functionsStack->pop();
     }
 

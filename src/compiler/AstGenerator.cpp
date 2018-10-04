@@ -39,10 +39,11 @@ public:
         staticConstructor->body->statements->push_back(stmt);
     }
 
-    Var *visitVarDeclaration(zeroscriptParser::VariableDeclarationPartContext *part, Body *pKind, bool isStatic) {
+    Var *visitVarDeclaration(zeroscriptParser::VariableDeclarationPartContext *part, Body *pKind, bool isStatic, bool isPrivate) {
         Var *var = new Var();
         var->setIdentifier(part->variableName->IDENT()->getText().data());
         var->isStatic = isStatic;
+        var->isPrivate = isPrivate;
         if (part->expression()) {
             var->value = visitExpression(part->expression(), pKind);
         } else var->value = new EmptyExpression();
@@ -54,11 +55,11 @@ public:
         vector<zeroscriptParser::VariableDeclarationPartContext *> declarations = varcontext->variableDeclarationPart();
         if (varcontext->STATIC() != NULL) {
             for (int i = 0; i < declarations.size(); i++) {
-                addStaticVar(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL));
+                addStaticVar(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL, varcontext->PRIVATE() != NULL));
             }
         } else {
             for (int i = 0; i < declarations.size(); i++) {
-                vars->push_back(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL));
+                vars->push_back(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL, varcontext->PRIVATE() != NULL));
             }
         }
         return vars;

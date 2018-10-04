@@ -154,9 +154,10 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
     char *byte_stream = initial_state->byte_stream;
     int_t fsize = initial_state->fsize;
     int_t release_stack_on_end = initial_state->stack_ptr == NULL;
-    z_reg_t* stack_start = (z_reg_t *) z_alloc_or_die(stack_file_size * sizeof(z_reg_t));;
+    z_reg_t * stack_start = initial_state->stack_ptr;
     if (release_stack_on_end) {
-        initial_state->stack_ptr = (z_reg_t *) z_alloc_or_die(stack_file_size * sizeof(z_reg_t));
+        stack_start = (z_reg_t *) z_alloc_or_die(stack_file_size * sizeof(z_reg_t));
+        initial_state->stack_ptr = stack_start;
     }
 
     z_object_t *current_context = (z_object_t *) initial_state->current_context;
@@ -174,8 +175,6 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
     char *field_name_to_get;
 
     z_object_t *object_to_search_on = NULL;
-
-    current_context->ref_count++;
 
     z_reg_t *locals_ptr = NULL;
     z_instruction_t *instruction_ptr;
@@ -669,7 +668,7 @@ OP_GET_FIELD_IMMEDIATE :
                     if (prop) {
                         *r2 = *prop;
                     } else {
-                        interpreter_throw_exception_from_str(initial_state, "cannot read property");
+                        interpreter_throw_exception_from_str(initial_state, "cannot read property on object");
                         RETURN_IF_ERROR;
                         GOTO_CATCH;
                     }
@@ -790,6 +789,7 @@ OP_CALL :
                 *r1 = other_state->return_value;
                 instruction_ptr++;
             } else {
+                //call async function in a separate thread
                 if (function_ref->function_ref_object.is_async) {
                     z_async_fnc_args_t *args = (z_async_fnc_args_t *) z_alloc_or_die(
                             sizeof(z_async_fnc_args_t));
@@ -806,7 +806,6 @@ OP_CALL :
                     called_fnc->context_object.requested_return_register_index = instruction_ptr->r1;
                     instruction_ptr = (z_instruction_t *) (byte_stream +
                                                            function_ref->function_ref_object.start_address);
-                    current_context->ref_count++;
                     current_context = called_fnc;
                 }
             }
@@ -840,7 +839,6 @@ OP_RETURN :
         z_reg_t *actual_return_reg = (+instruction_ptr->r0 + locals_ptr);
         instruction_ptr = current_context->context_object.return_address;
         uint_t return_reg = current_context->context_object.requested_return_register_index;
-        current_context->ref_count--;
         initial_state->current_context = current_context;
         current_context = (z_object_t *) current_context->context_object.return_context;
         initial_state->return_value = *actual_return_reg;
@@ -848,7 +846,6 @@ OP_RETURN :
             goto end;
             initial_state->return_code = 0;
         }
-        current_context->ref_count--;
         locals_ptr = (z_reg_t *) current_context->context_object.locals;
         z_reg_t *requested_return_reg = (return_reg + locals_ptr);
         *requested_return_reg = *actual_return_reg;
@@ -937,7 +934,7 @@ void interpreter_run_static_constructor(char *bytes, char *class_name) {
     z_object_t *context = context_new();;
     temp_state->current_context = context;
     temp_state->class_name = class_name;
-    z_reg_t* temp_stack = (z_reg_t*)(z_alloc_or_die(stack_file_size*sizeof(z_reg_t)));
+    z_reg_t *temp_stack = (z_reg_t *) (z_alloc_or_die(stack_file_size * sizeof(z_reg_t)));
     temp_state->stack_ptr = temp_stack;
     temp_state->instruction_pointer = static_block_ptr;
     z_object_t *called_fnc = context_new();
@@ -947,7 +944,8 @@ void interpreter_run_static_constructor(char *bytes, char *class_name) {
     called_fnc->context_object.requested_return_register_index = 0;
     temp_state->current_context = called_fnc;
     z_interpreter_run(temp_state);
-    Z_FREE(temp_stack);
+    //Z_FREE(temp_stack);
+    //Z_FREE(temp_state);
 }
 
 /**
@@ -967,8 +965,12 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char 
             );
             context->context_object.symbol_table = symbol_table;
         }
-        int_t *index_ptr = ((int_t *) map_get(symbol_table, field_name_to_get));
+        int_t flags = 0;
+        int_t *index_ptr = ((int_t *) map_get_flags(symbol_table, field_name_to_get, &flags));
         if (index_ptr) {
+            if((flags & MAP_FLAG_PRIVATE)){
+                return NULL;
+            }
             int_t index = *index_ptr;
             return (((z_reg_t *) context->context_object.locals) + index);
             //found!

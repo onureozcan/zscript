@@ -42,27 +42,29 @@ class Assembler {
                 instruction_ptr->r1 = (addData(str, (uint_t) (strlen(str) + 1)));
             } else if (instruction.opcode == FFRAME) {
                 z_instruction_t *instruction_ptr = ((z_instruction_t *) arraylist_get(program->instructions, i));
-                map<string, int> symbolTable = *((map<string, int> *) (instruction.r1));
+                map<string, uint_t> symbolTable = *(map<string, uint_t>*)instruction.r1;
+                map<string, uint_t> *privatesTable = (map<string, uint_t>*)instruction.r2;
 
-                typedef std::function<bool(std::pair<std::string, int>, std::pair<std::string, int>)> Comparator;
+                typedef std::function<bool(std::pair<std::string, int_t>, std::pair<std::string, int_t>)> Comparator;
 
                 // Defining a lambda function to compare two pairs. It will compare two pairs using second field
                 Comparator compFunctor =
-                        [](std::pair<std::string, int> elem1, std::pair<std::string, int> elem2) {
+                        [](std::pair<std::string, int_t> elem1, std::pair<std::string, int_t> elem2) {
                             return elem1.second < elem2.second;
                         };
 
                 // Declaring a set that will store the pairs using above comparision logic
-                std::set<std::pair<std::string, int>, Comparator> setOfWords(
+                std::set<std::pair<std::string, int_t>, Comparator> setOfWords(
                         symbolTable.begin(), symbolTable.end(), compFunctor);
-                int i = 0;
+                int_t i = 0;
                 int_t size = symbolTable.size();
                 instruction_ptr->r1 = addData((char *) &size, sizeof(int_t));
                 // Iterate over a set using range base for loop
-                // It will display the items in sorted order of properties
-                for (std::pair<std::string, int> pair : setOfWords) {
+                for (std::pair<std::string, int_t> pair : setOfWords) {
                     char *str = (char *) pair.first.data();
                     uint_t pos = (addData(str, (uint_t) (strlen(str) + 1)));
+                    char isPrivate = privatesTable!= NULL && privatesTable->find(str)!= privatesTable->end();
+                    (addData(&isPrivate,sizeof(char)));
                     i++;
                 }
                 instruction_ptr->r2 = i;

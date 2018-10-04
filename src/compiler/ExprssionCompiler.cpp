@@ -229,6 +229,7 @@ public:
             return compileTerminal(dynamic_cast<TerminalExpression *>(expr),
                                    requestedDestinationRegister, has_lookup_object);
         }
+        return 0;
     }
 
     ExpressionCompiler(Program *program, FunctionKind *function) {
