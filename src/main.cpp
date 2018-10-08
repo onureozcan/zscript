@@ -54,26 +54,19 @@ int main(int argc, const char *argv[]) {
     if (class_path == NULL) {
         file_path = (char *) (filename);
     } else {
-        file_path = (char *) z_alloc_or_die(strlen(class_path) + strlen(filename) + 2);
+        file_path = (char *) z_alloc_or_gc(strlen(class_path) + strlen(filename) + 2);
         sprintf(file_path, "%s/%s", class_path, filename);
     }
     char *bytes = compile_file(file_path, &len);
     object_manager_init(class_path);
     if (runMode) {
         clock_t begin = clock();
-        z_interpreter_state_t *initial_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
-        initial_state->fsize = len;
-        initial_state->byte_stream = bytes;
-        initial_state->current_context = NULL;
-        initial_state->instruction_pointer = NULL;
-        //TODO:ensure that filename matches classname.
-        char *class_name = (char *) (z_alloc_or_die(strlen(filename) + 1));
+        char *class_name = (char *) (z_alloc_or_gc(strlen(filename) + 1));
         strcpy(class_name, filename);
         class_name[strlen(filename) - 3] = 0;
         object_manager_register_object_type(class_name, bytes, len);
-        initial_state->class_name = class_name;
-        initial_state->is_async = FALSE;
-        initial_state->stack_ptr = NULL;
+        z_interpreter_state_t *initial_state = interpreter_state_new(context_new(),bytes,len,class_name,NULL,NULL);
+        object_manager_register_object_type(class_name, bytes, len);
         interpreter_run_static_constructor(bytes, class_name);
         initial_state = z_interpreter_run(initial_state);
         if (initial_state->return_code) {
@@ -88,7 +81,6 @@ int main(int argc, const char *argv[]) {
                 pthread_join(th,NULL);
             }
         }
-        printf("total allocated:%ld mb\n", total_allocated / (1024 * 1024));
     } else {
         FILE *ofile = fopen(oFilename, "wb");
         fwrite(bytes, static_cast<size_t>(len), 1, ofile);

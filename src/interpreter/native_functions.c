@@ -9,6 +9,11 @@ typedef struct native_fnc_t {
 
 map_t *native_functions = NULL;
 
+z_reg_t *native_gc(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
+    gc();
+    return stack;
+}
+
 z_reg_t *native_number(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
     z_reg_t *arg = stack--;
     if (arg->type == TYPE_NUMBER) {
@@ -102,4 +107,6 @@ void z_native_funcions_init() {
     map_insert(native_functions, "number", &wrapper);
     wrapper.fnc = native_to_int;
     map_insert(native_functions, "toInt", &wrapper);
+    wrapper.fnc = native_gc;
+    map_insert(native_functions, "gc", &wrapper);
 }

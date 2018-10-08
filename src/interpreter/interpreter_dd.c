@@ -9,6 +9,7 @@
 #define TYPE_NATIVE_FUNC 32
 #define TYPE_INSTANCE 64
 #define TYPE_CLASS_REF 128
+#define TYPE_CONTEXT 256
 
 //#define PRE_CALCULATE_JUMP_POINTERS
 
@@ -51,16 +52,24 @@ Z_INLINE static char *strconcat(const char *s1, const char *s2);
 
 
 typedef struct z_interpreter_state_t {
+    //context of currently running function
     void *current_context;
+    // root context
+    void *root_context;
+    // compiled bytecodes
     char *byte_stream;
+    // class name
     char *class_name;
+    // exception message (if so)
     char *exception_details;
     int_t return_code;
+    // byte code file size
     int_t fsize;
+    // current instruction pointer
     int_t instruction_pointer;
     z_reg_t return_value;
     z_reg_t *stack_ptr;
-    uint_t is_async;
+    z_reg_t *stack_start;
 } z_interpreter_state_t;
 
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state);
@@ -144,6 +153,9 @@ void *run_async_inner(void *);
 
 void *run_async(void *argsv);
 
+z_interpreter_state_t* interpreter_state_new(void *current_context, char *bytes, int_t len, char *class_name, z_reg_t *stack_ptr,
+                      z_reg_t *stack_start) ;
+
 /**
  * heart of the interpreter. interprets a given bytecode.
  * @param initial_state state representation with given parameters.
@@ -154,10 +166,11 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
     char *byte_stream = initial_state->byte_stream;
     int_t fsize = initial_state->fsize;
     int_t release_stack_on_end = initial_state->stack_ptr == NULL;
-    z_reg_t * stack_start = initial_state->stack_ptr;
+    z_reg_t *stack_start = initial_state->stack_ptr;
     if (release_stack_on_end) {
         stack_start = (z_reg_t *) z_alloc_or_die(stack_file_size * sizeof(z_reg_t));
         initial_state->stack_ptr = stack_start;
+        initial_state->stack_start = stack_start;
     }
 
     z_object_t *current_context = (z_object_t *) initial_state->current_context;
@@ -166,7 +179,9 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
         current_context = context_new();
         current_context->context_object.parent_context = NULL;
         current_context->context_object.return_context = NULL;
+        initial_state->root_context = current_context;
     }
+
 
     if (!native_functions) {
         z_native_funcions_init();
@@ -296,7 +311,9 @@ OP_MOV_STR :
     {
         INIT_R0;
         char *str = data + instruction_ptr->r1;
-        r0->val = (int_t) string_new(str);
+        char *copied = (char*)z_alloc_or_gc(strlen(str)+1);
+        strcpy(copied,str);
+        r0->val = (int_t) string_new(copied);
         r0->type = TYPE_STR;
         GOTO_NEXT
     };
@@ -866,13 +883,14 @@ OP_FFRAME :
         locals_ptr = (z_reg_t *) z_alloc_or_die(byte_size_locals);
         memset(locals_ptr, 0, byte_size_locals);
         current_context->context_object.locals = locals_ptr;
+        current_context->context_object.locals_count = sizeof_locals;
         current_context->context_object.symbols_address = instruction_ptr->r1;
         GOTO_NEXT;
     }
 end:
-    if (release_stack_on_end) {
+    /*if (release_stack_on_end) {
         Z_FREE(stack_start);
-    }
+    }*/
     return initial_state;
 }
 
@@ -889,14 +907,10 @@ void *run_async_inner(void *argsv) {
     z_async_fnc_args_t *args = (z_async_fnc_args_t *) argsv;
     z_interpreter_state_t *initial_state = args->initial_state;
     z_object_t *function_ref = args->function_ref;
-    z_interpreter_state_t *other_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
-    other_state->return_code = 0;
-    other_state->is_async = TRUE;
-    other_state->stack_ptr = NULL;
-    other_state->exception_details = NULL;
-    other_state->class_name = initial_state->class_name;
-    other_state->byte_stream = initial_state->byte_stream;
     z_object_t *called_fnc = context_new();
+    z_interpreter_state_t *other_state = interpreter_state_new(called_fnc, initial_state->byte_stream,
+                                                               initial_state->fsize, initial_state->class_name, NULL,
+                                                               NULL);
     called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
     called_fnc->context_object.return_context = NULL;
     called_fnc->context_object.return_address = NULL;
@@ -929,7 +943,6 @@ void interpreter_run_static_constructor(char *bytes, char *class_name) {
     int_t *static_block_ptr_ptr = (int_t *) (bytes + sizeof(int_t));
     int_t static_block_ptr = *static_block_ptr_ptr;
     z_interpreter_state_t *temp_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
-    temp_state->is_async = FALSE;
     temp_state->byte_stream = bytes;
     z_object_t *context = context_new();;
     temp_state->current_context = context;
@@ -955,7 +968,7 @@ void interpreter_run_static_constructor(char *bytes, char *class_name) {
  * @return register type.
  */
 z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_get) {
-    z_object_t *context = (z_object_t *) saved_state->current_context;
+    z_object_t *context = (z_object_t *) saved_state->root_context;
     while (context != NULL) {
         map_t *symbol_table = context->context_object.symbol_table;
         if (!symbol_table) {
@@ -968,7 +981,7 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char 
         int_t flags = 0;
         int_t *index_ptr = ((int_t *) map_get_flags(symbol_table, field_name_to_get, &flags));
         if (index_ptr) {
-            if((flags & MAP_FLAG_PRIVATE)){
+            if ((flags & MAP_FLAG_PRIVATE)) {
                 return NULL;
             }
             int_t index = *index_ptr;
@@ -989,7 +1002,7 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char 
  */
 int_t interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_set, z_reg_t *value) {
     saved_state->return_code = 0;
-    z_object_t *context = (z_object_t *) saved_state->current_context;
+    z_object_t *context = (z_object_t *) saved_state->root_context;
     map_t *symbol_table = context->context_object.symbol_table;
     if (!symbol_table) {
         //build symbol table
@@ -1055,4 +1068,21 @@ void interpreter_throw_exception_from_reg(z_interpreter_state_t *current_state, 
         message = ((z_object_t *) object_thrown->val)->operations.to_string((void *) object_thrown->val);
     }
     interpreter_throw_exception_from_str(current_state, message);
+}
+
+z_interpreter_state_t* interpreter_state_new(void *current_context, char *bytes, int_t len, char *class_name, z_reg_t *stack_ptr,
+                      z_reg_t *stack_start) {
+
+    z_interpreter_state_t *initial_state = (z_interpreter_state_t *) z_alloc_or_gc(sizeof(z_interpreter_state_t));
+    initial_state->fsize = len;
+    initial_state->byte_stream = bytes;
+    initial_state->current_context = context_new();
+    initial_state->instruction_pointer = NULL;
+    initial_state->class_name = class_name;
+    initial_state->stack_ptr = stack_ptr;
+    initial_state->return_code = 0;
+    initial_state->exception_details = NULL;
+    initial_state->stack_start = stack_start;
+    arraylist_push(interpreter_states_list, &initial_state);
+    return initial_state;
 }

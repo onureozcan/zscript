@@ -16,6 +16,7 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
 char *resolveImportedClassName(char *class_name, map_t *imports_table);
 
 #include "types/string.h"
+#include "garbage_collector.h"
 
 char *class_path = 0;
 
@@ -25,7 +26,7 @@ char *class_path = 0;
  * @return a string representation of the object.
  */
 char *obj_to_string(void *_self) {
-    char *buff = (char *) z_alloc_or_die(20);
+    char *buff = (char *) z_alloc_or_gc(20);
     snprintf(buff, 20, "obj@%d", (int_t) _self);
     return buff;
 }
@@ -47,6 +48,9 @@ struct operations object_operations = {
  * @param cp
  */
 void object_manager_init(char *cp) {
+    gc_objects_list = arraylist_new(sizeof(int_t));
+    interpreter_states_list = arraylist_new(sizeof(int_t));
+
     class_path = cp;
     if (cp == NULL) {
         class_path = ".";
@@ -102,7 +106,7 @@ char *resolveImportedClassName(char *class_name, map_t *imports_table) {
  * @param size size of bytecodes.
  */
 void object_manager_register_object_type(char *class_name, char *bytecodes, int_t size) {
-    z_type_info_t *type_info = (z_type_info_t *) (z_alloc_or_die(sizeof(z_type_info_t)));
+    z_type_info_t *type_info = (z_type_info_t *) (z_alloc_or_gc(sizeof(z_type_info_t)));
     type_info->bytecode_stream = bytecodes;
     type_info->bytecode_size = size;
     type_info->static_variables = map_new(sizeof(z_reg_t));
@@ -120,9 +124,11 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
  * @return z_object.
  */
 Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table) {
-    z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
+    z_object_t *obj = (z_object_t *) z_alloc_or_gc(sizeof(z_object_t));
     obj->properties = map_new(sizeof(z_reg_t));
     obj->key_list_cache = NULL;
+    obj->gc_version = 0;
+    obj->operations = object_operations;
     if (class_name) {
         class_name = resolveImportedClassName(class_name, imports_table);
         z_type_info_t *object_type_info = (z_type_info_t *) map_get(known_types_map, class_name);
@@ -135,7 +141,7 @@ Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table) {
             object_type_info = (z_type_info_t *) map_get(known_types_map, class_name);
         }
         obj->ordinary_object.type_info = object_type_info;
-        z_interpreter_state_t *initial_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
+        z_interpreter_state_t *initial_state = (z_interpreter_state_t *) z_alloc_or_gc(sizeof(z_interpreter_state_t));
         initial_state->fsize = obj->ordinary_object.type_info->bytecode_size;
         initial_state->byte_stream = obj->ordinary_object.type_info->bytecode_stream;
         initial_state->current_context = NULL;
@@ -143,9 +149,10 @@ Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table) {
         initial_state->class_name = class_name;
         initial_state->stack_ptr = NULL;
         obj->ordinary_object.saved_state = z_interpreter_run(initial_state);
+        obj->type = TYPE_INSTANCE;
         return obj;
     }
-    obj->operations = object_operations;
+    obj->type = TYPE_OBJ;
     z_reg_t temp;
     temp.type = TYPE_NATIVE_FUNC;
     temp.val = (int_t) native_keysize_wrapper;
@@ -167,7 +174,7 @@ Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table) {
  */
 void load_class_code(const char *class_name, char **bytes, size_t *fsize) {
     size_t size = (int_t) strlen(class_name) + (int_t) strlen(class_path) + 5;
-    char *file_to_load = (char *) z_alloc_or_die(size);
+    char *file_to_load = (char *) z_alloc_or_gc(size);
     snprintf(file_to_load, size, "%s/%s.zcl", class_path, class_name);
     FILE *f = fopen(file_to_load, "rb");
     if (f == NULL) {
@@ -188,7 +195,7 @@ void load_class_code(const char *class_name, char **bytes, size_t *fsize) {
         fseek(f, 0, SEEK_END);
         (*fsize) = (size_t) ftell(f);
         fseek(f, 0, SEEK_SET);
-        (*bytes) = (char *) z_alloc_or_die((*fsize) + 1);
+        (*bytes) = (char *) z_alloc_or_gc((*fsize) + 1);
         fread((*bytes), (*fsize), 1, f);
         fclose(f);
     }
@@ -198,35 +205,43 @@ void load_class_code(const char *class_name, char **bytes, size_t *fsize) {
  * @return z_object_t.
  */
 Z_INLINE z_object_t *context_new() {
-    z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
-    obj->context_object.symbol_table = NULL;
-    obj->context_object.catches_list = NULL;
+    z_object_t *obj = (z_object_t *) z_alloc_or_gc(sizeof(z_object_t));
+    memset(obj,0,sizeof(z_object_t));
+    obj->type = TYPE_CONTEXT;
+    arraylist_push(gc_objects_list,&obj);
     return obj;
 }
 
 Z_INLINE z_object_t *function_ref_new(uint_t start_addr, void *parent_context, z_interpreter_state_t *state, uint_t is_async) {
-    z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
+    z_object_t *obj = (z_object_t *) z_alloc_or_gc(sizeof(z_object_t));
     obj->function_ref_object.start_address = start_addr;
     obj->function_ref_object.parent_context = parent_context;
     obj->function_ref_object.responsible_interpreter_state = state;
     obj->function_ref_object.is_async = is_async;
     obj->operations = object_operations;
+    obj->gc_version = 0;
+    obj->type = TYPE_FUNCTION_REF;
     return obj;
 }
 
 Z_INLINE z_object_t *class_ref_new(char *name) {
-    z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
+    z_object_t *obj = (z_object_t *) z_alloc_or_gc(sizeof(z_object_t));
     obj->class_ref_object.value = name;
     obj->operations = object_operations;
+    obj->gc_version = 0;
+    obj->type = TYPE_CLASS_REF;
     return obj;
 }
 
 
 z_object_t *string_new(char *data) {
-    z_object_t *obj = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
+    z_object_t *obj = (z_object_t *) z_alloc_or_gc(sizeof(z_object_t));
     obj->string_object.value = data;
     obj->operations = string_operations;
     obj->properties = string_native_properties_map;
+    obj->type = TYPE_STR;
+    obj->gc_version = 0;
+    arraylist_push(gc_objects_list,&obj);
     return obj;
 }
 
@@ -249,5 +264,6 @@ map_t *build_symbol_table(const char *data) {
     }
     return symbol_table;
 }
+
 
 #endif //ZEROSCRIPT_OBJECT_C

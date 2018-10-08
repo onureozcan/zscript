@@ -36,7 +36,7 @@ public :
         AddressCalculator *addressCalculator = new AddressCalculator(ast);
         // ast->print();
         compileClass((ast));
-       // program->print();
+        // program->print();
         Assembler assembler;
         bytes = assembler.toBytes(program, &len);
     }

@@ -2,8 +2,10 @@
 // Created by onur on 11.05.2018.
 //
 
-void err_out_of_memory() {
+void error_and_exit(char *message) ;
 
+void err_out_of_memory() {
+    error_and_exit("cannot allocate memory");
 }
 
 void error_and_exit(char *message) {

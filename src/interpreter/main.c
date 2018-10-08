@@ -23,7 +23,7 @@ int main(int argc, const char *argv[]) {
     fseek(f, 0, SEEK_END);
     size_t fsize = (size_t) ftell(f);
     fseek(f, 0, SEEK_SET);
-    char *bytes = z_alloc_or_die(fsize + 1);
+    char *bytes = z_alloc_or_gc(fsize + 1);
     fread(bytes, fsize, 1, f);
     fclose(f);
     clock_t begin = clock();

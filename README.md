@@ -21,7 +21,7 @@ it will later be used to provide userspace to zeroscriptOs project.
 
 - [X] try/catch
 
-- [ ] access modifiers
+- [X] access modifiers
 
 - [ ] class inheritance
 
