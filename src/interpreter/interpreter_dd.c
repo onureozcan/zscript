@@ -74,7 +74,11 @@ typedef struct z_interpreter_state_t {
 
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state);
 
-void interpreter_run_static_constructor(char *byte_stream, char *class_name);
+
+z_interpreter_state_t* interpreter_state_new(void *current_context, char *bytes, int_t len, char *class_name, z_reg_t *stack_ptr,
+                                             z_reg_t *stack_start) ;
+
+void interpreter_run_static_constructor(char *byte_stream, uint_t len, char *class_name);
 
 /**
  * get a field of an object.
@@ -152,9 +156,6 @@ void goto_catch_block(const z_interpreter_state_t *initial_state,
 void *run_async_inner(void *);
 
 void *run_async(void *argsv);
-
-z_interpreter_state_t* interpreter_state_new(void *current_context, char *bytes, int_t len, char *class_name, z_reg_t *stack_ptr,
-                      z_reg_t *stack_start) ;
 
 /**
  * heart of the interpreter. interprets a given bytecode.
@@ -918,7 +919,7 @@ void *run_async_inner(void *argsv) {
     other_state->instruction_pointer = (function_ref->function_ref_object.start_address);
     other_state->current_context = called_fnc;
     z_interpreter_run(other_state);
-    Z_FREE(argsv);
+    z_free(argsv);
     if (other_state->return_code != 0) {
         error_and_exit(other_state->exception_details);
     }
@@ -939,15 +940,15 @@ void goto_catch_block(const z_interpreter_state_t *initial_state,
  * runs static constructor of a given compiled class.
  * @param bytes
  */
-void interpreter_run_static_constructor(char *bytes, char *class_name) {
+void interpreter_run_static_constructor(char *bytes, uint_t len ,char *class_name) {
     int_t *static_block_ptr_ptr = (int_t *) (bytes + sizeof(int_t));
     int_t static_block_ptr = *static_block_ptr_ptr;
-    z_interpreter_state_t *temp_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
+    z_object_t *context = context_new();
+    z_reg_t *temp_stack = (z_reg_t *) (z_alloc_or_die(stack_file_size * sizeof(z_reg_t)));
+    z_interpreter_state_t *temp_state = interpreter_state_new(context,bytes,len,class_name,temp_stack,temp_stack);//(z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
     temp_state->byte_stream = bytes;
-    z_object_t *context = context_new();;
     temp_state->current_context = context;
     temp_state->class_name = class_name;
-    z_reg_t *temp_stack = (z_reg_t *) (z_alloc_or_die(stack_file_size * sizeof(z_reg_t)));
     temp_state->stack_ptr = temp_stack;
     temp_state->instruction_pointer = static_block_ptr;
     z_object_t *called_fnc = context_new();
@@ -1073,15 +1074,16 @@ void interpreter_throw_exception_from_reg(z_interpreter_state_t *current_state, 
 z_interpreter_state_t* interpreter_state_new(void *current_context, char *bytes, int_t len, char *class_name, z_reg_t *stack_ptr,
                       z_reg_t *stack_start) {
 
-    z_interpreter_state_t *initial_state = (z_interpreter_state_t *) z_alloc_or_gc(sizeof(z_interpreter_state_t));
+    z_interpreter_state_t *initial_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
     initial_state->fsize = len;
     initial_state->byte_stream = bytes;
-    initial_state->current_context = context_new();
+    initial_state->current_context = current_context;
     initial_state->instruction_pointer = NULL;
     initial_state->class_name = class_name;
     initial_state->stack_ptr = stack_ptr;
     initial_state->return_code = 0;
     initial_state->exception_details = NULL;
+    initial_state->root_context = NULL;
     initial_state->stack_start = stack_start;
     arraylist_push(interpreter_states_list, &initial_state);
     return initial_state;

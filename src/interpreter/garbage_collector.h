@@ -56,17 +56,17 @@ void gc_free_object(z_object_t *object) {
             z_free(object);
             break;
         case TYPE_CONTEXT:
-            //if (object->context_object.locals)
-            //    z_free(object->context_object.locals);
-            z_free(object);
+            if (object->context_object.locals)
+                z_free(object->context_object.locals);
+             z_free(object);
             break;
     }
 }
 
 void gc_visit_state(z_interpreter_state_t *state) {
-    //z_object_t *root_context = (z_object_t *) (state->root_context);
+    z_object_t *root_context = (z_object_t *) (state->root_context);
     z_object_t *context = (z_object_t *) (state->current_context);
-    //gc_visit_object(root_context);
+    gc_visit_object(root_context);
     gc_visit_object(context);
     gc_visit_stack(state->stack_start, state->stack_ptr);
 }
@@ -116,8 +116,8 @@ void gc_visit_object(z_object_t *object) {
 }
 
 void gc_visit_function_ref(z_object_t *object) {
-    gc_visit_object((z_object_t *) (object->function_ref_object.parent_context));
-    gc_visit_state(object->function_ref_object.responsible_interpreter_state);
+//    gc_visit_object((z_object_t *) (object->function_ref_object.parent_context));
+//    gc_visit_state(object->function_ref_object.responsible_interpreter_state);
 }
 
 void gc_visit_instance(z_object_t *object) {

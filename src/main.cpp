@@ -64,10 +64,9 @@ int main(int argc, const char *argv[]) {
         char *class_name = (char *) (z_alloc_or_gc(strlen(filename) + 1));
         strcpy(class_name, filename);
         class_name[strlen(filename) - 3] = 0;
-        object_manager_register_object_type(class_name, bytes, len);
         z_interpreter_state_t *initial_state = interpreter_state_new(context_new(),bytes,len,class_name,NULL,NULL);
         object_manager_register_object_type(class_name, bytes, len);
-        interpreter_run_static_constructor(bytes, class_name);
+        interpreter_run_static_constructor(bytes, len, class_name);
         initial_state = z_interpreter_run(initial_state);
         if (initial_state->return_code) {
             error_and_exit(initial_state->exception_details);

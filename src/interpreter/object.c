@@ -83,7 +83,7 @@ z_type_info_t *object_manager_get_or_load_type_info(char *class_name, map_t *imp
         class_name = resolveImportedClassName(class_name, imports_table);
         load_class_code(class_name, &bytes, &fsize);
         object_manager_register_object_type(class_name, bytes, fsize);
-        interpreter_run_static_constructor(bytes, class_name);
+        interpreter_run_static_constructor(bytes, fsize, class_name);
         type_info = (z_type_info_t *) map_get(known_types_map, class_name);
     }
     return type_info;
@@ -91,11 +91,11 @@ z_type_info_t *object_manager_get_or_load_type_info(char *class_name, map_t *imp
 
 char *resolveImportedClassName(char *class_name, map_t *imports_table) {
     if (imports_table != NULL) {
-            char** imported_path_ptr = (char**)map_get(imports_table, class_name);
-            if (imported_path_ptr!= NULL){
-                class_name = *imported_path_ptr;
-            }
+        char **imported_path_ptr = (char **) map_get(imports_table, class_name);
+        if (imported_path_ptr != NULL) {
+            class_name = *imported_path_ptr;
         }
+    }
     return class_name;
 }
 
@@ -141,13 +141,14 @@ Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table) {
             object_type_info = (z_type_info_t *) map_get(known_types_map, class_name);
         }
         obj->ordinary_object.type_info = object_type_info;
-        z_interpreter_state_t *initial_state = (z_interpreter_state_t *) z_alloc_or_gc(sizeof(z_interpreter_state_t));
-        initial_state->fsize = obj->ordinary_object.type_info->bytecode_size;
-        initial_state->byte_stream = obj->ordinary_object.type_info->bytecode_stream;
-        initial_state->current_context = NULL;
-        initial_state->instruction_pointer = NULL;
-        initial_state->class_name = class_name;
-        initial_state->stack_ptr = NULL;
+        z_interpreter_state_t *initial_state = interpreter_state_new(
+                NULL,
+                obj->ordinary_object.type_info->bytecode_stream,
+                obj->ordinary_object.type_info->bytecode_size,
+                class_name,
+                NULL,
+                NULL
+        );
         obj->ordinary_object.saved_state = z_interpreter_run(initial_state);
         obj->type = TYPE_INSTANCE;
         return obj;
@@ -206,13 +207,14 @@ void load_class_code(const char *class_name, char **bytes, size_t *fsize) {
  */
 Z_INLINE z_object_t *context_new() {
     z_object_t *obj = (z_object_t *) z_alloc_or_gc(sizeof(z_object_t));
-    memset(obj,0,sizeof(z_object_t));
+    memset(obj, 0, sizeof(z_object_t));
     obj->type = TYPE_CONTEXT;
-    arraylist_push(gc_objects_list,&obj);
+    arraylist_push(gc_objects_list, &obj);
     return obj;
 }
 
-Z_INLINE z_object_t *function_ref_new(uint_t start_addr, void *parent_context, z_interpreter_state_t *state, uint_t is_async) {
+Z_INLINE z_object_t *
+function_ref_new(uint_t start_addr, void *parent_context, z_interpreter_state_t *state, uint_t is_async) {
     z_object_t *obj = (z_object_t *) z_alloc_or_gc(sizeof(z_object_t));
     obj->function_ref_object.start_address = start_addr;
     obj->function_ref_object.parent_context = parent_context;
@@ -241,7 +243,7 @@ z_object_t *string_new(char *data) {
     obj->properties = string_native_properties_map;
     obj->type = TYPE_STR;
     obj->gc_version = 0;
-    arraylist_push(gc_objects_list,&obj);
+    arraylist_push(gc_objects_list, &obj);
     return obj;
 }
 
@@ -255,9 +257,9 @@ map_t *build_symbol_table(const char *data) {
         char *item = (char *) (data + pos);
         uint_t size_of_item = strlen(item);
         pos += size_of_item + 2; //1 for isPrivate
-        char is_private = *(char *) (data + pos -1);
-        int_t flag = 0| MAP_FLAG_ENUMERABLE;
-        if(is_private){
+        char is_private = *(char *) (data + pos - 1);
+        int_t flag = 0 | MAP_FLAG_ENUMERABLE;
+        if (is_private) {
             flag |= MAP_FLAG_PRIVATE;
         }
         map_insert_flags(symbol_table, item, &value, flag);
