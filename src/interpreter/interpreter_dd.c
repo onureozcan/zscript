@@ -21,7 +21,7 @@
 
 #define GOTO_NEXT goto *dispatch_table[(++instruction_ptr)->opcode];
 #define GOTO_CURRENT goto *dispatch_table[(instruction_ptr)->opcode];
-#define ADD_CONTEXT_TO_GC_LIST(c) arraylist_push(gc_objects_list,&(c))
+#define ADD_OBJECT_TO_GC_LIST(c) arraylist_push(gc_objects_list,&(c))
 
 #else
 
@@ -893,7 +893,7 @@ OP_FFRAME :
         current_context->context_object.locals = locals_ptr;
         current_context->context_object.locals_count = sizeof_locals;
         current_context->context_object.symbols_address = instruction_ptr->r1;
-        ADD_CONTEXT_TO_GC_LIST(current_context);
+        ADD_OBJECT_TO_GC_LIST(current_context);
         GOTO_NEXT;
     }
 end:
@@ -956,12 +956,11 @@ void interpreter_run_static_constructor(char *bytes, uint_t len, char *class_nam
     z_interpreter_state_t *temp_state = interpreter_state_new(context, bytes, len, class_name, temp_stack,
                                                               temp_stack);
     temp_state->instruction_pointer = static_block_ptr;
-    z_object_t *called_fnc = context_new();
+    /*z_object_t *called_fnc = context_new();
     called_fnc->context_object.parent_context = NULL;
     called_fnc->context_object.return_context = NULL;
     called_fnc->context_object.return_address = NULL;
-    called_fnc->context_object.requested_return_register_index = 0;
-    temp_state->current_context = called_fnc;
+    called_fnc->context_object.requested_return_register_index = 0;*/
     z_interpreter_run(temp_state);
 }
 
@@ -1015,8 +1014,12 @@ int_t interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *fi
         );
         context->context_object.symbol_table = symbol_table;
     }
-    int_t *index_ptr = ((int_t *) map_get(symbol_table, field_name_to_set));
+    int_t flags = 0;
+    int_t *index_ptr = ((int_t *) map_get_flags(symbol_table, field_name_to_set, &flags));
     if (index_ptr) {
+        if ((flags & MAP_FLAG_PRIVATE)) {
+            interpreter_throw_exception_from_str(saved_state, "cannot set private property of object");
+        }
         int_t index = *index_ptr;
         *(((z_reg_t *) context->context_object.locals) + index) = *value;
     } else {
@@ -1059,7 +1062,7 @@ void interpreter_throw_exception_from_str(z_interpreter_state_t *current_state, 
     char *class_name = current_state->class_name;
     int_t length = strlen(message) + strlen(class_name) + 100;
     detailed_message = (char *) z_alloc_or_die((size_t) length);
-    snprintf(detailed_message, length, "uncaught: %s \nclass:%s", message, class_name);
+    snprintf(detailed_message, length, "%s \nclass:%s", message, class_name);
     current_state->return_code = 1;
     current_state->exception_details = detailed_message;
 }

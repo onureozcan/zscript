@@ -1,8 +1,8 @@
 //
 // Created by onur on 11.05.2018.
 //
-uint_t heap_limit = 2 * (1024 * 1024);
-uint_t used_heap = 0;
+int_t heap_limit = 1 * (1024 * 1024);
+int_t used_heap = 0;
 
 Z_INLINE any_ptr_t z_decorate_ptr(any_ptr_t ptr, uint_t size) {
     *((uint_t *) ptr) = size;
@@ -15,12 +15,20 @@ Z_INLINE any_ptr_t z_undecorate_ptr(any_ptr_t ptr) {
     return ptr;
 }
 
+void z_free(any_ptr_t ptr);
+
+any_ptr_t z_alloc_or_die(size_t size);
+
 any_ptr_t z_realloc_or_die(any_ptr_t old_ptr, size_t size) {
-    any_ptr_t ptr = Z_REALLOC(old_ptr - sizeof(uint_t), size + sizeof(uint_t));
-    if (ptr == NULL) {
+    any_ptr_t ptr = z_alloc_or_die(size);
+    size_t old_size = *((uint_t *) (old_ptr - sizeof(uint_t)));
+    if (ptr) {
+        memcpy(ptr, old_ptr, old_size);
+        z_free(old_ptr);
+        return ptr;
+    } else {
         err_out_of_memory();
     }
-    return z_decorate_ptr(ptr, size);
 }
 
 int_t gc();

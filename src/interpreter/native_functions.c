@@ -63,6 +63,7 @@ z_reg_t *native_object_key_list(z_reg_t *stack, z_reg_t *return_reg, z_object_t 
     return stack;
 }
 
+
 z_reg_t *native_print(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     z_reg_t *arg = stack--;
     if (arg->type == TYPE_NUMBER) {

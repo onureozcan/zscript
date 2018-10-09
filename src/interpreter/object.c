@@ -222,6 +222,7 @@ function_ref_new(uint_t start_addr, void *parent_context, z_interpreter_state_t 
     obj->operations = object_operations;
     obj->gc_version = 0;
     obj->type = TYPE_FUNCTION_REF;
+    ADD_OBJECT_TO_GC_LIST(obj);
     return obj;
 }
 

@@ -34,6 +34,7 @@ public:
                     //mark as used
                     (*registerTable)[index] = 0;
                     ret = index;
+                    break;
                 }
             }
             if (!ret) {

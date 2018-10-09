@@ -94,6 +94,7 @@ public:
         program->addInstruction(CALL,
                                 (uint_t) exprResultReg, (uint_t) resultReg,
                                 (uint_t) NULL);
+        freeRegister(exprResultReg);
         return resultReg;
     }
 
