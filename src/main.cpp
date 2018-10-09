@@ -73,7 +73,7 @@ int main(int argc, const char *argv[]) {
         }
         clock_t end = clock();
         double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
-        printf("time spent: %lf\n", time_spent);
+        printf("time spent: %lf\nused heap:%ldmb\n", time_spent, used_heap / (1024*1024));
         if (threads) {
             for (int_t i = 0; i < threads->size; i++) {
                 pthread_t th = **(pthread_t**)arraylist_get(threads,i);

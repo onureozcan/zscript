@@ -209,7 +209,6 @@ Z_INLINE z_object_t *context_new() {
     z_object_t *obj = (z_object_t *) z_alloc_or_gc(sizeof(z_object_t));
     memset(obj, 0, sizeof(z_object_t));
     obj->type = TYPE_CONTEXT;
-    arraylist_push(gc_objects_list, &obj);
     return obj;
 }
 

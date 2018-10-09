@@ -1,7 +1,7 @@
 //
 // Created by onur on 11.05.2018.
 //
-uint_t heap_limit = 5 * (1024 * 1024);
+uint_t heap_limit = 2 * (1024 * 1024);
 uint_t used_heap = 0;
 
 Z_INLINE any_ptr_t z_decorate_ptr(any_ptr_t ptr, uint_t size) {
@@ -44,12 +44,10 @@ Z_INLINE any_ptr_t z_alloc_or_gc(size_t size) {
     used_heap += size;
 TRY_ALLOCATE:
     if (used_heap > heap_limit) {
-        printf("memory request failed, gc..\n");
         gc();
         if (used_heap > heap_limit) {
             err_out_of_memory();
-        } else{
-            printf("recover from gc\n");
+        } else {
             goto TRY_ALLOCATE;
         }
     }

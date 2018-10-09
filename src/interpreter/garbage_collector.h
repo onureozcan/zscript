@@ -23,11 +23,13 @@ void gc_free_object(z_object_t *object);
 
 void gc_visit_stack(z_reg_t *stack_start, z_reg_t *stack_ptr);
 
+void gc_visit_register(z_reg_t *reg);
+
 uhalf_int_t gc_version = 0;
 
 int_t gc() {
     // TODO: lock threads
-    printf("----- GC STARTS, USED HEAP: %ld--------\n", used_heap / (1024));
+    //printf("----- GC STARTS, USED HEAP: %ld--------\n", used_heap / (1024));
     gc_version++;
     for (int_t i = 0; i < interpreter_states_list->size; i++) {
         z_interpreter_state_t *state = *(z_interpreter_state_t **) arraylist_get(interpreter_states_list, i);
@@ -45,7 +47,7 @@ int_t gc() {
     z_free(gc_objects_list->data);
     z_free(gc_objects_list);
     gc_objects_list = new_list;
-    printf("----- GC ENDS, USED HEAP: %ld--------\n", used_heap / (1024));
+    //printf("----- GC ENDS, USED HEAP: %ld--------\n", used_heap / (1024));
 }
 
 void gc_free_object(z_object_t *object) {
@@ -56,9 +58,12 @@ void gc_free_object(z_object_t *object) {
             z_free(object);
             break;
         case TYPE_CONTEXT:
-            if (object->context_object.locals)
-                z_free(object->context_object.locals);
-             z_free(object);
+            z_free(object->context_object.locals);
+            if (object->context_object.catches_list)
+                z_free(object->context_object.catches_list);
+            if (object->context_object.symbol_table)
+                z_free(object->context_object.symbol_table);
+            z_free(object);
             break;
     }
 }
@@ -73,11 +78,15 @@ void gc_visit_state(z_interpreter_state_t *state) {
 
 void gc_visit_stack(z_reg_t *stack_start, z_reg_t *stack_ptr) {
     for (int_t i = 0; i < stack_ptr - stack_start; i++) {
-        z_reg_t reg = stack_start[i];
-        if (reg.type != TYPE_NUMBER && reg.type != TYPE_NATIVE_FUNC) {
-            z_object_t *value = (z_object_t *) reg.val;
-            gc_visit_object(value);
-        }
+        z_reg_t reg = stack_start[i + 1];
+        gc_visit_register(&reg);
+    }
+}
+
+void gc_visit_register(z_reg_t *reg) {
+    if (reg->type != TYPE_NUMBER && reg->type != TYPE_NATIVE_FUNC) {
+        z_object_t *value = (z_object_t *) reg->val;
+        gc_visit_object(value);
     }
 }
 
@@ -86,10 +95,7 @@ void gc_visit_context(const z_object_t *context) {
     uint_t locals_count = context->context_object.locals_count;
     for (int_t i = 2; i < locals_count; i++) {
         z_reg_t reg = locals[i];
-        if (reg.type != TYPE_NUMBER && reg.type != TYPE_NATIVE_FUNC) {
-            z_object_t *value = (z_object_t *) reg.val;
-            gc_visit_object(value);
-        }
+        gc_visit_register(&reg);
     }
     gc_visit_object((z_object_t *) (context->context_object.parent_context));
     gc_visit_object((z_object_t *) (context->context_object.return_context));

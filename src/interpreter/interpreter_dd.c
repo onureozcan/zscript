@@ -21,6 +21,7 @@
 
 #define GOTO_NEXT goto *dispatch_table[(++instruction_ptr)->opcode];
 #define GOTO_CURRENT goto *dispatch_table[(instruction_ptr)->opcode];
+#define ADD_CONTEXT_TO_GC_LIST(c) arraylist_push(gc_objects_list,&(c))
 
 #else
 
@@ -75,8 +76,9 @@ typedef struct z_interpreter_state_t {
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state);
 
 
-z_interpreter_state_t* interpreter_state_new(void *current_context, char *bytes, int_t len, char *class_name, z_reg_t *stack_ptr,
-                                             z_reg_t *stack_start) ;
+z_interpreter_state_t *
+interpreter_state_new(void *current_context, char *bytes, int_t len, char *class_name, z_reg_t *stack_ptr,
+                      z_reg_t *stack_start);
 
 void interpreter_run_static_constructor(char *byte_stream, uint_t len, char *class_name);
 
@@ -312,8 +314,8 @@ OP_MOV_STR :
     {
         INIT_R0;
         char *str = data + instruction_ptr->r1;
-        char *copied = (char*)z_alloc_or_gc(strlen(str)+1);
-        strcpy(copied,str);
+        char *copied = (char *) z_alloc_or_gc(strlen(str) + 1);
+        strcpy(copied, str);
         r0->val = (int_t) string_new(copied);
         r0->type = TYPE_STR;
         GOTO_NEXT
@@ -361,7 +363,9 @@ OP_ADD :
                 r2->type = TYPE_NUMBER;
             } else {
                 z_object_t *obj = (z_object_t *) r1->val;
-                char *str = strconcat(num_to_str(r0->number_val), (const char *) obj->operations.to_string(obj));
+                char* num_str = num_to_str(r0->number_val);
+                char *str = strconcat(num_str, (const char *) obj->operations.to_string(obj));
+                z_free(num_str);
                 r2->val = (uint_t) string_new(str);
                 r2->type = TYPE_STR;
             }
@@ -369,7 +373,9 @@ OP_ADD :
             char *ret_str = NULL;
             z_object_t *obj1 = (z_object_t *) r0->val;
             if (r1->type == TYPE_NUMBER) {
-                ret_str = strconcat((const char *) obj1->operations.to_string(obj1), num_to_str(r1->number_val));
+                char* num_str = num_to_str(r1->number_val);
+                ret_str = strconcat((const char *) obj1->operations.to_string(obj1), num_str);
+                z_free(num_str);
             } else {
                 z_object_t *obj2 = (z_object_t *) r1->val;
                 ret_str = strconcat((const char *) obj1->operations.to_string(obj1),
@@ -825,6 +831,7 @@ OP_CALL :
                     instruction_ptr = (z_instruction_t *) (byte_stream +
                                                            function_ref->function_ref_object.start_address);
                     current_context = called_fnc;
+                    initial_state->current_context = current_context;
                 }
             }
             GOTO_CURRENT;
@@ -886,6 +893,7 @@ OP_FFRAME :
         current_context->context_object.locals = locals_ptr;
         current_context->context_object.locals_count = sizeof_locals;
         current_context->context_object.symbols_address = instruction_ptr->r1;
+        ADD_CONTEXT_TO_GC_LIST(current_context);
         GOTO_NEXT;
     }
 end:
@@ -940,16 +948,13 @@ void goto_catch_block(const z_interpreter_state_t *initial_state,
  * runs static constructor of a given compiled class.
  * @param bytes
  */
-void interpreter_run_static_constructor(char *bytes, uint_t len ,char *class_name) {
+void interpreter_run_static_constructor(char *bytes, uint_t len, char *class_name) {
     int_t *static_block_ptr_ptr = (int_t *) (bytes + sizeof(int_t));
     int_t static_block_ptr = *static_block_ptr_ptr;
     z_object_t *context = context_new();
     z_reg_t *temp_stack = (z_reg_t *) (z_alloc_or_die(stack_file_size * sizeof(z_reg_t)));
-    z_interpreter_state_t *temp_state = interpreter_state_new(context,bytes,len,class_name,temp_stack,temp_stack);//(z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
-    temp_state->byte_stream = bytes;
-    temp_state->current_context = context;
-    temp_state->class_name = class_name;
-    temp_state->stack_ptr = temp_stack;
+    z_interpreter_state_t *temp_state = interpreter_state_new(context, bytes, len, class_name, temp_stack,
+                                                              temp_stack);
     temp_state->instruction_pointer = static_block_ptr;
     z_object_t *called_fnc = context_new();
     called_fnc->context_object.parent_context = NULL;
@@ -958,8 +963,6 @@ void interpreter_run_static_constructor(char *bytes, uint_t len ,char *class_nam
     called_fnc->context_object.requested_return_register_index = 0;
     temp_state->current_context = called_fnc;
     z_interpreter_run(temp_state);
-    //Z_FREE(temp_stack);
-    //Z_FREE(temp_state);
 }
 
 /**
@@ -1071,7 +1074,8 @@ void interpreter_throw_exception_from_reg(z_interpreter_state_t *current_state, 
     interpreter_throw_exception_from_str(current_state, message);
 }
 
-z_interpreter_state_t* interpreter_state_new(void *current_context, char *bytes, int_t len, char *class_name, z_reg_t *stack_ptr,
+z_interpreter_state_t *
+interpreter_state_new(void *current_context, char *bytes, int_t len, char *class_name, z_reg_t *stack_ptr,
                       z_reg_t *stack_start) {
 
     z_interpreter_state_t *initial_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
