@@ -123,9 +123,8 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
  * @param class_name class name to load. can be null.
  * @return z_object.
  */
-Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table, z_reg_t* stack_start, z_reg_t* stack_ptr) {
+Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table, z_reg_t* stack_start, z_reg_t* stack_ptr, z_reg_t* gc_fix) {
     z_object_t *obj = (z_object_t *) z_alloc_or_gc(sizeof(z_object_t));
-    obj->properties = map_new(sizeof(z_reg_t));
     obj->key_list_cache = NULL;
     obj->gc_version = 0;
     obj->operations = object_operations;
@@ -149,10 +148,15 @@ Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table, z_reg_t*
                 stack_start,
                 stack_ptr
         );
-        obj->ordinary_object.saved_state = z_interpreter_run(initial_state);
+        gc_fix->val = (int_t) obj;
+        gc_fix->type = TYPE_INSTANCE;
+        obj->ordinary_object.saved_state = initial_state;
         obj->type = TYPE_INSTANCE;
+        ADD_OBJECT_TO_GC_LIST(obj);
+        z_interpreter_run(initial_state);
         return obj;
     }
+    obj->properties = map_new(sizeof(z_reg_t));
     obj->type = TYPE_OBJ;
     z_reg_t temp;
     temp.type = TYPE_NATIVE_FUNC;

@@ -29,7 +29,7 @@ uhalf_int_t gc_version = 0;
 
 int_t gc() {
     // TODO: lock threads
-    printf("----- GC STARTS, USED HEAP: %ld--------\n", used_heap );
+    //printf("----- GC STARTS, USED HEAP: %ld--------\n", used_heap );
     gc_version++;
     for (int_t i = 0; i < interpreter_states_list->size; i++) {
         z_interpreter_state_t *state = *(z_interpreter_state_t **) arraylist_get(interpreter_states_list, i);
@@ -47,11 +47,10 @@ int_t gc() {
     z_free(gc_objects_list->data);
     z_free(gc_objects_list);
     gc_objects_list = new_list;
-    printf("----- GC ENDS, USED HEAP: %ld--------\n", used_heap );
+    //printf("----- GC ENDS, USED HEAP: %ld--------\n", used_heap );
 }
 
 void gc_free_object(z_object_t *object) {
-    //printf("free: %ld\n", object);
     switch (object->type) {
         case TYPE_STR:
             z_free(object->string_object.value);
@@ -70,7 +69,6 @@ void gc_free_object(z_object_t *object) {
             z_free(object);
             break;
         case TYPE_CLASS_REF:
-            z_free(object->class_ref_object.value);
             z_free(object);
             break;
         case TYPE_INSTANCE:
@@ -122,7 +120,6 @@ void gc_visit_context(const z_object_t *context) {
 
 void gc_visit_object(z_object_t *object) {
     if (!object) return;
-    //printf("mark: %ld\n", object);
     if (object->gc_version == gc_version) return;
     object->gc_version = gc_version;
     switch (object->type) {

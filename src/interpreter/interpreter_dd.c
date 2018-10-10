@@ -23,7 +23,7 @@
 #define GOTO_CURRENT goto *dispatch_table[(instruction_ptr)->opcode];
 #define ADD_OBJECT_TO_GC_LIST(c) arraylist_push(gc_objects_list,&(c))
 #define ADD_ROOT_TO_GC_LIST(c) arraylist_push(interpreter_states_list,&(c))
-
+#define CREATE_STACK(s) (z_reg_t *) (z_alloc_or_die((s) * sizeof(z_reg_t)));
 #else
 
 #define GOTO_NEXT goto *(++instruction_ptr)->opcode;
@@ -169,21 +169,7 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
 
     char *byte_stream = initial_state->byte_stream;
     int_t fsize = initial_state->fsize;
-    z_reg_t *stack_start = initial_state->stack_ptr;
-    if (initial_state->stack_ptr == NULL) {
-        stack_start = (z_reg_t *) z_alloc_or_die(stack_file_size * sizeof(z_reg_t));
-        initial_state->stack_ptr = stack_start;
-        initial_state->stack_start = stack_start;
-    }
-
     z_object_t *current_context = (z_object_t *) initial_state->current_context;
-
-    if (initial_state->current_context == NULL) {
-        current_context = context_new();
-        current_context->context_object.parent_context = NULL;
-        current_context->context_object.return_context = NULL;
-        initial_state->root_context = current_context;
-    }
 
     if (!native_functions) {
         z_native_funcions_init();
@@ -642,6 +628,7 @@ OP_GET_FIELD_IMMEDIATE :
             //not found? maybe a class constructor?
             r2->val = (int_t) class_ref_new(field_name_to_get);
             r2->type = TYPE_CLASS_REF;
+            ADD_OBJECT_TO_GC_LIST(r2->val);
         } else {
             //access r0 and search upon it
             INIT_R0;
@@ -827,9 +814,8 @@ OP_CALL :
             INIT_R1;
             z_type_info_t *type_info = object_manager_get_or_load_type_info(initial_state->class_name, NULL);
             r1->val = (int_t) object_new(((z_object_t *) r0->val)->class_ref_object.value, type_info->imports_table,
-                                         initial_state->stack_start, initial_state->stack_ptr);
-            r1->type = TYPE_INSTANCE;
-            ADD_OBJECT_TO_GC_LIST(r1->val);
+                                         initial_state->stack_start, initial_state->stack_ptr, r1);
+            //r1->type = TYPE_INSTANCE;
         } else {
             interpreter_throw_exception_from_str(initial_state, "callee is not a function");
             RETURN_IF_ERROR;
@@ -939,9 +925,8 @@ void interpreter_run_static_constructor(char *bytes, uint_t len, char *class_nam
     int_t *static_block_ptr_ptr = (int_t *) (bytes + sizeof(int_t));
     int_t static_block_ptr = *static_block_ptr_ptr;
     z_object_t *context = context_new();
-    z_reg_t *temp_stack = (z_reg_t *) (z_alloc_or_die(stack_file_size * sizeof(z_reg_t)));
-    z_interpreter_state_t *temp_state = interpreter_state_new(context, bytes, len, class_name, temp_stack,
-                                                              temp_stack);
+    z_interpreter_state_t *temp_state = interpreter_state_new(context, bytes, len, class_name, NULL,
+                                                              NULL);
     temp_state->instruction_pointer = static_block_ptr;
     z_interpreter_run(temp_state);
     ADD_ROOT_TO_GC_LIST(temp_state);
@@ -1063,7 +1048,13 @@ void interpreter_throw_exception_from_reg(z_interpreter_state_t *current_state, 
 z_interpreter_state_t *
 interpreter_state_new(void *current_context, char *bytes, int_t len, char *class_name, z_reg_t *stack_ptr,
                       z_reg_t *stack_start) {
-
+    if (!stack_start) {
+        stack_start = CREATE_STACK(stack_file_size);
+        stack_ptr = stack_start;
+    }
+    if (current_context == NULL) {
+        current_context = context_new();
+    }
     z_interpreter_state_t *initial_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
     initial_state->fsize = len;
     initial_state->byte_stream = bytes;

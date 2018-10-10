@@ -25,7 +25,7 @@ it will later be used to provide userspace to zeroscriptOs project.
 
 - [ ] class inheritance
 
-- [ ] garbage collector
+- [X] garbage collector
 
 - [X] asynchronous functions
 
