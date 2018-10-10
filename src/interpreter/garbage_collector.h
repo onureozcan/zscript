@@ -60,9 +60,9 @@ void gc_free_object(z_object_t *object) {
             if (object->context_object.locals)
                 z_free(object->context_object.locals);
             if (object->context_object.catches_list)
-                z_free(object->context_object.catches_list);
+                arraylist_free(object->context_object.catches_list);
             if (object->context_object.symbol_table)
-                z_free(object->context_object.symbol_table);
+                map_free(object->context_object.symbol_table);
             z_free(object);
             break;
         case TYPE_FUNCTION_REF:

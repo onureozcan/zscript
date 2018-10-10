@@ -11,25 +11,26 @@
 #define TYPE_CLASS_REF 128
 #define TYPE_CONTEXT 256
 
-//#define PRE_CALCULATE_JUMP_POINTERS
+#define PRE_CALCULATE_DISPATCH_POINTERS
 
 #define INIT_R0 z_reg_t* r0 = locals_ptr + instruction_ptr->r0
 #define INIT_R1 z_reg_t* r1 = locals_ptr + instruction_ptr->r1
 #define INIT_R2 z_reg_t* r2 = locals_ptr + instruction_ptr->r2
 
-#ifndef PRE_CALCULATE_JUMP_POINTERS
+#ifndef PRE_CALCULATE_DISPATCH_POINTERS
 
 #define GOTO_NEXT goto *dispatch_table[(++instruction_ptr)->opcode];
 #define GOTO_CURRENT goto *dispatch_table[(instruction_ptr)->opcode];
-#define ADD_OBJECT_TO_GC_LIST(c) arraylist_push(gc_objects_list,&(c))
-#define ADD_ROOT_TO_GC_LIST(c) arraylist_push(interpreter_states_list,&(c))
-#define CREATE_STACK(s) (z_reg_t *) (z_alloc_or_die((s) * sizeof(z_reg_t)));
 #else
 
 #define GOTO_NEXT goto *(++instruction_ptr)->opcode;
 #define GOTO_CURRENT goto *(instruction_ptr)->opcode;
 
 #endif
+
+#define ADD_OBJECT_TO_GC_LIST(c) arraylist_push(gc_objects_list,&(c))
+#define ADD_ROOT_TO_GC_LIST(c) arraylist_push(interpreter_states_list,&(c))
+#define CREATE_STACK(s) (z_reg_t *) (z_alloc_or_die((s) * sizeof(z_reg_t)));
 
 #ifdef FLOAT_SUPPORT
 #else
@@ -167,7 +168,12 @@ void *run_async(void *argsv);
  */
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
 
+#ifdef PRE_CALCULATE_DISPATCH_POINTERS
+    char *byte_stream = (char *) z_alloc_or_die((size_t) initial_state->fsize);
+    memcpy(byte_stream, initial_state->byte_stream, (size_t) initial_state->fsize);
+#else
     char *byte_stream = initial_state->byte_stream;
+#endif
     int_t fsize = initial_state->fsize;
     z_object_t *current_context = (z_object_t *) initial_state->current_context;
 
@@ -230,7 +236,7 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
     };
     fsize -= code_start;
     //initialize jump properties
-#ifdef PRE_CALCULATE_JUMP_POINTERS
+#ifdef PRE_CALCULATE_DISPATCH_POINTERS
     for (long i = 0; i < fsize; i += sizeof(z_instruction_t)) {
         instruction_ptr = (z_instruction_t *) (code + i);
         //printf("%s %d, %d, %d \n", name_opcode(instruction_ptr->opcode), instruction_ptr->r0, instruction_ptr->r1, instruction_ptr->r2);
@@ -388,8 +394,6 @@ OP_DIV :
             }
             r2->number_val = ((r0->number_val) / (r1->number_val));
             r2->type = TYPE_NUMBER;
-        } else {
-            //TODO:operator overloading
         }
         GOTO_NEXT;
     };
@@ -401,8 +405,6 @@ OP_MUL :
         if (r0->type == TYPE_NUMBER) {
             r2->number_val = ((r0->number_val) * (r1->number_val));
             r2->type = TYPE_NUMBER;
-        } else {
-            //TODO:operator overloading
         }
         GOTO_NEXT
     };
@@ -412,10 +414,8 @@ OP_MOD :
         INIT_R1;
         INIT_R2;
         if (r0->type == TYPE_NUMBER) {
-            r2->number_val = fmod(r0->number_val, r1->number_val);//(int_t) r0->number_val % (int_t) r1->number_val;
+            r2->number_val = fmod(r0->number_val, r1->number_val);
             r2->type = TYPE_NUMBER;
-        } else {
-            //TODO:operator overloading
         }
         GOTO_NEXT
     };
@@ -500,13 +500,9 @@ OP_JL :
     {
         INIT_R0;
         INIT_R1;
-        if (r0->type == TYPE_NUMBER) {
-            if (((r0->number_val) < (r1->number_val))) {
-                instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
-                GOTO_CURRENT;
-            }
-        } else {
-            //TODO:operator overloading
+        if (((r0->number_val) < (r1->number_val))) {
+            instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
+            GOTO_CURRENT;
         }
         GOTO_NEXT
     };
@@ -514,13 +510,9 @@ OP_JLE :
     {
         INIT_R0;
         INIT_R1;
-        if (r0->type == TYPE_NUMBER) {
-            if (((r0->number_val) <= (r1->number_val))) {
-                instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
-                GOTO_CURRENT;
-            }
-        } else {
-            //TODO:operator overloading
+        if (((r0->number_val) <= (r1->number_val))) {
+            instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
+            GOTO_CURRENT;
         }
         GOTO_NEXT
     };
@@ -528,13 +520,9 @@ OP_JG :
     {
         INIT_R0;
         INIT_R1;
-        if (r0->type == TYPE_NUMBER) {
-            if (((r0->number_val) > (r1->number_val))) {
-                instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
-                GOTO_CURRENT;
-            }
-        } else {
-            //TODO:operator overloading
+        if (((r0->number_val) > (r1->number_val))) {
+            instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
+            GOTO_CURRENT;
         }
         GOTO_NEXT
     };
@@ -542,13 +530,9 @@ OP_JGE :
     {
         INIT_R0;
         INIT_R1;
-        if (r0->type == TYPE_NUMBER) {
-            if (((r0->number_val) >= (r1->number_val))) {
-                instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
-                GOTO_CURRENT;
-            }
-        } else {
-            //TODO:operator overloading
+        if (((r0->number_val) >= (r1->number_val))) {
+            instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
+            GOTO_CURRENT;
         }
         GOTO_NEXT
     };
@@ -873,6 +857,10 @@ OP_FFRAME :
         GOTO_NEXT;
     }
 end:
+
+#ifdef PRE_CALCULATE_DISPATCH_POINTERS
+    z_free(byte_stream);
+#endif
     return initial_state;
 }
 
@@ -1055,6 +1043,7 @@ interpreter_state_new(void *current_context, char *bytes, int_t len, char *class
     if (current_context == NULL) {
         current_context = context_new();
     }
+
     z_interpreter_state_t *initial_state = (z_interpreter_state_t *) z_alloc_or_die(sizeof(z_interpreter_state_t));
     initial_state->fsize = len;
     initial_state->byte_stream = bytes;
