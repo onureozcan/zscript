@@ -59,7 +59,7 @@ map_t* string_native_properties_map = 0;
 arraylist_t* gc_objects_list = 0;
 arraylist_t* interpreter_states_list = 0;
 
-Z_INLINE z_object_t *object_new(char *class_name, map_t* imports_table);
+Z_INLINE z_object_t *object_new(char *class_name, map_t* imports_table, z_reg_t* stack_start, z_reg_t* stack_ptr);
 Z_INLINE z_object_t *string_new(char *data);
 
 #endif //ZEROSCRIPT_OBJECT_H

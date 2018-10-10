@@ -57,8 +57,9 @@ void arraylist_set(arraylist_t *self, any_ptr_t item, int_t index) {
     }
     memcpy(self->data + (self->size_of_item * index), (char *) item, self->size_of_item);
 }
+
 Z_INLINE any_ptr_t arraylist_top(arraylist_t *self) {
-    return self->top -self->size_of_item;
+    return self->top - self->size_of_item;
 }
 
 Z_INLINE any_ptr_t arraylist_pop(arraylist_t *self) {
@@ -77,3 +78,25 @@ Z_INLINE static void extend_capacity(arraylist_t *self) {
     self->top = &self->data[self->size * self->size_of_item];
 }
 
+void arraylist_remove_item(arraylist_t *self, any_ptr_t ptr) {
+    for (int_t i = 0; i < self->size; i++) {
+        any_ptr_t next = arraylist_get(self, i);
+        int_t found = TRUE;
+        for (int_t j = 0; j < self->size_of_item; j++) {
+            if (((char *) ptr)[j] != ((char *) next)[j]) {
+                found = FALSE;
+                break;
+            }
+        }
+        if (found) {
+            self->size--;
+            memcpy(next, arraylist_get(self, i + 1), (size_t) (self->size - i));
+            break;
+        }
+    }
+}
+
+void arraylist_free(arraylist_t *self) {
+    z_free(self->data);
+    z_free(self);
+}

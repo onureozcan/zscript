@@ -65,6 +65,7 @@ int main(int argc, const char *argv[]) {
         strcpy(class_name, filename);
         class_name[strlen(filename) - 3] = 0;
         z_interpreter_state_t *initial_state = interpreter_state_new(context_new(),bytes,len,class_name,NULL,NULL);
+        ADD_ROOT_TO_GC_LIST(initial_state);
         object_manager_register_object_type(class_name, bytes, len);
         interpreter_run_static_constructor(bytes, len, class_name);
         initial_state = z_interpreter_run(initial_state);

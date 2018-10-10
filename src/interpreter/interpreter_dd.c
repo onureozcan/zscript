@@ -22,6 +22,7 @@
 #define GOTO_NEXT goto *dispatch_table[(++instruction_ptr)->opcode];
 #define GOTO_CURRENT goto *dispatch_table[(instruction_ptr)->opcode];
 #define ADD_OBJECT_TO_GC_LIST(c) arraylist_push(gc_objects_list,&(c))
+#define ADD_ROOT_TO_GC_LIST(c) arraylist_push(interpreter_states_list,&(c))
 
 #else
 
@@ -168,9 +169,8 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
 
     char *byte_stream = initial_state->byte_stream;
     int_t fsize = initial_state->fsize;
-    int_t release_stack_on_end = initial_state->stack_ptr == NULL;
     z_reg_t *stack_start = initial_state->stack_ptr;
-    if (release_stack_on_end) {
+    if (initial_state->stack_ptr == NULL) {
         stack_start = (z_reg_t *) z_alloc_or_die(stack_file_size * sizeof(z_reg_t));
         initial_state->stack_ptr = stack_start;
         initial_state->stack_start = stack_start;
@@ -184,7 +184,6 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
         current_context->context_object.return_context = NULL;
         initial_state->root_context = current_context;
     }
-
 
     if (!native_functions) {
         z_native_funcions_init();
@@ -331,12 +330,8 @@ OP_INC:
     {
         INIT_R0;
         INIT_R1;
-        if (r0->type == TYPE_NUMBER) {
-            r1->number_val = (r0->number_val) + 1;
-            r1->type = TYPE_NUMBER;
-        } else {
-            //TODO:operator overloading
-        }
+        r1->number_val = (++r0->number_val);
+        r1->type = TYPE_NUMBER;
 
         GOTO_NEXT;
     };
@@ -344,12 +339,8 @@ OP_DEC:
     {
         INIT_R0;
         INIT_R1;
-        if (r0->type == TYPE_NUMBER) {
-            r1->number_val = (r0->number_val) - 1;
-            r1->type = TYPE_NUMBER;
-        } else {
-            //TODO:operator overloading
-        }
+        r1->number_val = (--r0->number_val);
+        r1->type = TYPE_NUMBER;
         GOTO_NEXT;
     };
 OP_ADD :
@@ -363,7 +354,7 @@ OP_ADD :
                 r2->type = TYPE_NUMBER;
             } else {
                 z_object_t *obj = (z_object_t *) r1->val;
-                char* num_str = num_to_str(r0->number_val);
+                char *num_str = num_to_str(r0->number_val);
                 char *str = strconcat(num_str, (const char *) obj->operations.to_string(obj));
                 z_free(num_str);
                 r2->val = (uint_t) string_new(str);
@@ -373,7 +364,7 @@ OP_ADD :
             char *ret_str = NULL;
             z_object_t *obj1 = (z_object_t *) r0->val;
             if (r1->type == TYPE_NUMBER) {
-                char* num_str = num_to_str(r1->number_val);
+                char *num_str = num_to_str(r1->number_val);
                 ret_str = strconcat((const char *) obj1->operations.to_string(obj1), num_str);
                 z_free(num_str);
             } else {
@@ -394,12 +385,8 @@ OP_SUB :
         INIT_R0;
         INIT_R1;
         INIT_R2;
-        if (r0->type == TYPE_NUMBER) {
-            r2->number_val = ((r0->number_val) - (r1->number_val));
-            r2->type = TYPE_NUMBER;
-        } else {
-            //TODO:operator overloading
-        }
+        r2->number_val = ((r0->number_val) - (r1->number_val));
+        r2->type = TYPE_NUMBER;
         GOTO_NEXT
     };
 OP_DIV :
@@ -653,8 +640,8 @@ OP_GET_FIELD_IMMEDIATE :
                 GOTO_NEXT;
             }
             //not found? maybe a class constructor?
-            r2->type = TYPE_CLASS_REF;
             r2->val = (int_t) class_ref_new(field_name_to_get);
+            r2->type = TYPE_CLASS_REF;
         } else {
             //access r0 and search upon it
             INIT_R0;
@@ -801,6 +788,7 @@ OP_CALL :
                 called_fnc->context_object.requested_return_register_index = instruction_ptr->r1;
                 other_state->instruction_pointer = (function_ref->function_ref_object.start_address);
                 other_state->stack_ptr = initial_state->stack_ptr;
+                other_state->stack_start = initial_state->stack_start;
                 other_state->current_context = called_fnc;
                 z_interpreter_run(other_state);
                 if (other_state->return_code) {
@@ -837,9 +825,11 @@ OP_CALL :
             GOTO_CURRENT;
         } else if (r0->type == TYPE_CLASS_REF) {
             INIT_R1;
-            r1->type = TYPE_INSTANCE;
             z_type_info_t *type_info = object_manager_get_or_load_type_info(initial_state->class_name, NULL);
-            r1->val = (int_t) object_new(((z_object_t *) r0->val)->class_ref_object.value, type_info->imports_table);
+            r1->val = (int_t) object_new(((z_object_t *) r0->val)->class_ref_object.value, type_info->imports_table,
+                                         initial_state->stack_start, initial_state->stack_ptr);
+            r1->type = TYPE_INSTANCE;
+            ADD_OBJECT_TO_GC_LIST(r1->val);
         } else {
             interpreter_throw_exception_from_str(initial_state, "callee is not a function");
             RETURN_IF_ERROR;
@@ -891,15 +881,12 @@ OP_FFRAME :
         locals_ptr = (z_reg_t *) z_alloc_or_die(byte_size_locals);
         memset(locals_ptr, 0, byte_size_locals);
         current_context->context_object.locals = locals_ptr;
-        current_context->context_object.locals_count = sizeof_locals;
+        current_context->context_object.locals_count = sizeof_locals + 1;
         current_context->context_object.symbols_address = instruction_ptr->r1;
         ADD_OBJECT_TO_GC_LIST(current_context);
         GOTO_NEXT;
     }
 end:
-    /*if (release_stack_on_end) {
-        Z_FREE(stack_start);
-    }*/
     return initial_state;
 }
 
@@ -956,12 +943,8 @@ void interpreter_run_static_constructor(char *bytes, uint_t len, char *class_nam
     z_interpreter_state_t *temp_state = interpreter_state_new(context, bytes, len, class_name, temp_stack,
                                                               temp_stack);
     temp_state->instruction_pointer = static_block_ptr;
-    /*z_object_t *called_fnc = context_new();
-    called_fnc->context_object.parent_context = NULL;
-    called_fnc->context_object.return_context = NULL;
-    called_fnc->context_object.return_address = NULL;
-    called_fnc->context_object.requested_return_register_index = 0;*/
     z_interpreter_run(temp_state);
+    ADD_ROOT_TO_GC_LIST(temp_state);
 }
 
 /**
@@ -1090,8 +1073,7 @@ interpreter_state_new(void *current_context, char *bytes, int_t len, char *class
     initial_state->stack_ptr = stack_ptr;
     initial_state->return_code = 0;
     initial_state->exception_details = NULL;
-    initial_state->root_context = NULL;
+    initial_state->root_context = current_context;
     initial_state->stack_start = stack_start;
-    arraylist_push(interpreter_states_list, &initial_state);
     return initial_state;
 }

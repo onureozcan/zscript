@@ -123,7 +123,7 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
  * @param class_name class name to load. can be null.
  * @return z_object.
  */
-Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table) {
+Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table, z_reg_t* stack_start, z_reg_t* stack_ptr) {
     z_object_t *obj = (z_object_t *) z_alloc_or_gc(sizeof(z_object_t));
     obj->properties = map_new(sizeof(z_reg_t));
     obj->key_list_cache = NULL;
@@ -146,8 +146,8 @@ Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table) {
                 obj->ordinary_object.type_info->bytecode_stream,
                 obj->ordinary_object.type_info->bytecode_size,
                 class_name,
-                NULL,
-                NULL
+                stack_start,
+                stack_ptr
         );
         obj->ordinary_object.saved_state = z_interpreter_run(initial_state);
         obj->type = TYPE_INSTANCE;

@@ -21,7 +21,7 @@ any_ptr_t z_alloc_or_die(size_t size);
 
 any_ptr_t z_realloc_or_die(any_ptr_t old_ptr, size_t size) {
     any_ptr_t ptr = z_alloc_or_die(size);
-    size_t old_size = *((uint_t *) (old_ptr - sizeof(uint_t)));
+    size_t old_size = *((uint_t *) (old_ptr - sizeof(uint_t))) - sizeof(uint_t);
     if (ptr) {
         memcpy(ptr, old_ptr, old_size);
         z_free(old_ptr);

@@ -29,7 +29,7 @@ uhalf_int_t gc_version = 0;
 
 int_t gc() {
     // TODO: lock threads
-    //printf("----- GC STARTS, USED HEAP: %ld kb--------\n", used_heap / (1024));
+    printf("----- GC STARTS, USED HEAP: %ld--------\n", used_heap );
     gc_version++;
     for (int_t i = 0; i < interpreter_states_list->size; i++) {
         z_interpreter_state_t *state = *(z_interpreter_state_t **) arraylist_get(interpreter_states_list, i);
@@ -47,18 +47,19 @@ int_t gc() {
     z_free(gc_objects_list->data);
     z_free(gc_objects_list);
     gc_objects_list = new_list;
-    //printf("----- GC ENDS, USED HEAP: %ld kb--------\n", used_heap / (1024));
+    printf("----- GC ENDS, USED HEAP: %ld--------\n", used_heap );
 }
 
 void gc_free_object(z_object_t *object) {
+    //printf("free: %ld\n", object);
     switch (object->type) {
         case TYPE_STR:
-            //printf("free'd:%s\n",object->string_object.value);
             z_free(object->string_object.value);
             z_free(object);
             break;
         case TYPE_CONTEXT:
-            z_free(object->context_object.locals);
+            if (object->context_object.locals)
+                z_free(object->context_object.locals);
             if (object->context_object.catches_list)
                 z_free(object->context_object.catches_list);
             if (object->context_object.symbol_table)
@@ -68,14 +69,29 @@ void gc_free_object(z_object_t *object) {
         case TYPE_FUNCTION_REF:
             z_free(object);
             break;
+        case TYPE_CLASS_REF:
+            z_free(object->class_ref_object.value);
+            z_free(object);
+            break;
+        case TYPE_INSTANCE:
+            z_free(object->ordinary_object.saved_state);
+            z_free(object);
+            break;
+        case TYPE_OBJ:
+            map_free(object->properties);
+            if (object->key_list_cache) {
+                z_free(object->key_list_cache);
+            }
+            z_free(object);
+            break;
     }
 }
 
 void gc_visit_state(z_interpreter_state_t *state) {
     z_object_t *root_context = (z_object_t *) (state->root_context);
     z_object_t *context = (z_object_t *) (state->current_context);
-    gc_visit_object(root_context);
     gc_visit_object(context);
+    gc_visit_object(root_context);
     gc_visit_stack(state->stack_start, state->stack_ptr);
 }
 
@@ -106,6 +122,7 @@ void gc_visit_context(const z_object_t *context) {
 
 void gc_visit_object(z_object_t *object) {
     if (!object) return;
+    //printf("mark: %ld\n", object);
     if (object->gc_version == gc_version) return;
     object->gc_version = gc_version;
     switch (object->type) {
@@ -130,11 +147,20 @@ void gc_visit_function_ref(z_object_t *object) {
 }
 
 void gc_visit_instance(z_object_t *object) {
-
+    gc_visit_state(object->ordinary_object.saved_state);
 }
 
 void gc_visit_object_with_map(z_object_t *object) {
-
+    map_t *self = object->properties;
+    for (int i = 0; i < MAP_BAG_SIZE; i++) {
+        arraylist_t *kbag = self->keys[i];
+        arraylist_t *vbag = self->values[i];
+        if (kbag) {
+            for (int_t j = 0; j < kbag->size; j++) {
+                gc_visit_register((z_reg_t *) arraylist_get(vbag, j));
+            }
+        }
+    }
 }
 
 #endif //ZEROSCRIPT_GARBAGE_COLLECTOR_H

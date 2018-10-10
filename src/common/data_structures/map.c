@@ -111,3 +111,17 @@ arraylist_t *map_key_list(map_t *self) {
     }
     return keys;
 }
+
+void map_free(map_t* self){
+    for (int_t i = 0; i < MAP_BAG_SIZE; i++) {
+        arraylist_t *kbag = self->keys[i];
+        arraylist_t *fbag = self->flags[i];
+        arraylist_t *vbag = self->values[i];
+        if (kbag){
+            arraylist_free(kbag);
+            arraylist_free(vbag);
+            arraylist_free(fbag);
+        }
+    }
+    z_free(self);
+}
