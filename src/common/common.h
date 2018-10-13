@@ -13,6 +13,13 @@
 #define TRUE 1
 #define FALSE 0
 
+pthread_t main_thread;
+
+long timestamp()
+{
+    return (long) clock();
+}
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -25,6 +32,6 @@
 #include "data_structures/arraylist.c"
 #include "data_structures/map.c"
 
-arraylist_t* threads;
+arraylist_t* thread_list;
 
 #endif //ZEROSCRIPT_COMMON_H

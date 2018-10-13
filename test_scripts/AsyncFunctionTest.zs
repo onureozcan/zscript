@@ -1,4 +1,5 @@
 import "../test_scripts/Math" as Math
+import "../test_scripts/primetest" as Primetest
 
 class AsyncFucntionTest(){
 
@@ -10,15 +11,12 @@ class AsyncFucntionTest(){
     asyncFnc3();
 
     function synchronousFnc(){
-        for(var i = 0;i<10;i++){
-            print(i);
-        }
+        //these primetests both require gc and yet they should not corrupt each other's gc graph
+        new Primetest();
     }
 
     async function asyncFnc(){
-        for(var i = 0;i<10;i++){
-            print(i);
-        }
+        new Primetest();
     }
 
     async function asynFncWithThrow(){

@@ -71,10 +71,13 @@ Z_INLINE any_ptr_t arraylist_pop(arraylist_t *self) {
 Z_INLINE any_ptr_t arraylist_get(arraylist_t *self, int_t index) {
     return (any_ptr_t) (self->data + index * self->size_of_item);
 }
-//private functions
+
 Z_INLINE static void extend_capacity(arraylist_t *self) {
+    char* new_data = (char*) z_alloc_or_die(self->capacity * self->size_of_item * 2);
+    memcpy(new_data, self->data, self->size * self->size_of_item);
+    z_free(self->data);
+    self->data = new_data;
     self->capacity = self->capacity * 2;
-    self->data = (char *) z_realloc_or_die(self->data, self->capacity * self->size_of_item);
     self->top = &self->data[self->size * self->size_of_item];
 }
 
@@ -94,6 +97,12 @@ void arraylist_remove_item(arraylist_t *self, any_ptr_t ptr) {
             break;
         }
     }
+}
+
+void arraylist_remove_index(arraylist_t *self, int_t i) {
+    any_ptr_t next = arraylist_get(self, i);
+    self->size--;
+    memcpy(next, arraylist_get(self, i + 1), (size_t) (self->size - i));
 }
 
 void arraylist_free(arraylist_t *self) {

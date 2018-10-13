@@ -31,7 +31,6 @@ char *compile_file(const char *filename, size_t *len) {
 }
 
 int main(int argc, const char *argv[]) {
-
     bool runMode = false;
     const char *compile_flag = NULL;
     const char *filename = NULL;
@@ -61,10 +60,13 @@ int main(int argc, const char *argv[]) {
     object_manager_init(class_path);
     if (runMode) {
         clock_t begin = clock();
+        main_thread = pthread_self();
+        pthread_barrier_init(&gc_safe_barrier, NULL, 1);
+        thread_list = arraylist_new(sizeof(int_t));
         char *class_name = (char *) (z_alloc_or_gc(strlen(filename) + 1));
         strcpy(class_name, filename);
         class_name[strlen(filename) - 3] = 0;
-        z_interpreter_state_t *initial_state = interpreter_state_new(context_new(),bytes,len,class_name,NULL,NULL);
+        z_interpreter_state_t *initial_state = interpreter_state_new(context_new(), bytes, len, class_name, NULL, NULL);
         ADD_ROOT_TO_GC_LIST(initial_state);
         object_manager_register_object_type(class_name, bytes, len);
         interpreter_run_static_constructor(bytes, len, class_name);
@@ -72,15 +74,16 @@ int main(int argc, const char *argv[]) {
         if (initial_state->return_code) {
             error_and_exit(initial_state->exception_details);
         }
+        if (event_queue) {
+            wait_for_event();
+        }
+        for (int_t i = 0; i < thread_list->size; i++) {
+            pthread_t *thread = *(pthread_t **) arraylist_get(thread_list, i);
+            pthread_join(*thread, NULL);
+        }
         clock_t end = clock();
         double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
-        printf("time spent: %lf\nused heap:%ldmb\n", time_spent, used_heap / (1024*1024));
-        if (threads) {
-            for (int_t i = 0; i < threads->size; i++) {
-                pthread_t th = **(pthread_t**)arraylist_get(threads,i);
-                pthread_join(th,NULL);
-            }
-        }
+        printf("time spent: %lf\nused heap:%ldmb\n", time_spent, used_heap / (1024 * 1024));
     } else {
         FILE *ofile = fopen(oFilename, "wb");
         fwrite(bytes, static_cast<size_t>(len), 1, ofile);

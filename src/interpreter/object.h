@@ -61,5 +61,6 @@ arraylist_t* interpreter_states_list = 0;
 
 Z_INLINE z_object_t *object_new(char *class_name, map_t* imports_table, z_reg_t* stack_start, z_reg_t* stack_ptr, z_reg_t* gc_fix);
 Z_INLINE z_object_t *string_new(char *data);
+Z_INLINE z_object_t *context_new();
 
 #endif //ZEROSCRIPT_OBJECT_H

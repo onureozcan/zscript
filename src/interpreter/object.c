@@ -27,7 +27,7 @@ char *class_path = 0;
  */
 char *obj_to_string(void *_self) {
     char *buff = (char *) z_alloc_or_gc(20);
-    snprintf(buff, 20, "obj@%d", (int_t) _self);
+    snprintf(buff, 20, "obj@%p", _self);
     return buff;
 }
 
@@ -35,6 +35,11 @@ static map_t *known_types_map = NULL;
 static native_fnc_t *native_strlen_wrapper = NULL;
 static native_fnc_t *native_keysize_wrapper = NULL;
 static native_fnc_t *native_keylist_wrapper = NULL;
+
+
+char* str_to_string(void* _self){
+    return ((z_object_t*) _self)->string_object.value;
+}
 
 struct operations string_operations = {
         str_to_string
@@ -247,7 +252,7 @@ z_object_t *string_new(char *data) {
     obj->properties = string_native_properties_map;
     obj->type = TYPE_STR;
     obj->gc_version = 0;
-    arraylist_push(gc_objects_list, &obj);
+    ADD_OBJECT_TO_GC_LIST(obj);
     return obj;
 }
 

@@ -28,8 +28,8 @@
 
 #endif
 
-#define ADD_OBJECT_TO_GC_LIST(c) arraylist_push(gc_objects_list,&(c))
-#define ADD_ROOT_TO_GC_LIST(c) arraylist_push(interpreter_states_list,&(c))
+#define ADD_OBJECT_TO_GC_LIST(c) GC_LIST_LOCK arraylist_push(gc_objects_list,&(c)); GC_LIST_UNLOCK
+#define ADD_ROOT_TO_GC_LIST(c) GC_LIST_LOCK arraylist_push(interpreter_states_list,&(c)); GC_LIST_UNLOCK
 #define CREATE_STACK(s) (z_reg_t *) (z_alloc_or_die((s) * sizeof(z_reg_t)));
 
 #ifdef FLOAT_SUPPORT
@@ -77,7 +77,6 @@ typedef struct z_interpreter_state_t {
 
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state);
 
-
 z_interpreter_state_t *
 interpreter_state_new(void *current_context, char *bytes, int_t len, char *class_name, z_reg_t *stack_ptr,
                       z_reg_t *stack_start);
@@ -107,7 +106,9 @@ void interpreter_throw_exception_from_reg(z_interpreter_state_t *current_state, 
 void interpreter_throw_exception_from_str(z_interpreter_state_t *current_state, char *message);
 
 #include <cmath>
+#include <unistd.h>
 #include "object.h"
+#include "event_queue.c"
 #include "native_functions.c"
 #include "object.c"
 
@@ -157,9 +158,31 @@ void goto_catch_block(const z_interpreter_state_t *initial_state,
                       z_instruction_t **instruction_ptr_ptr,
                       z_reg_t **locals_ptr);
 
-void *run_async_inner(void *);
-
 void *run_async(void *argsv);
+
+void *run_async(void *argsv) {
+    z_async_fnc_args_t *args = (z_async_fnc_args_t *) (argsv);
+    z_interpreter_state_t *initial_state = args->initial_state;
+    z_object_t *function_ref = args->function_ref;
+    z_object_t *called_fnc = context_new();
+    z_interpreter_state_t *other_state = interpreter_state_new(called_fnc, initial_state->byte_stream,
+                                                               initial_state->fsize, initial_state->class_name, NULL,
+                                                               NULL);
+    ADD_ROOT_TO_GC_LIST(other_state);
+    called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
+    other_state->instruction_pointer = (function_ref->function_ref_object.start_address);
+    other_state->current_context = called_fnc;
+    z_interpreter_run(other_state);
+    z_free(argsv);
+    if (other_state->return_code != 0) {
+        error_and_exit(other_state->exception_details);
+    }
+    THREAD_LIST_LOCK
+    total_thread_count--;
+    init_gc_barrier(total_thread_count);
+    THREAD_LIST_UNLOCK
+    return NULL;
+}
 
 /**
  * heart of the interpreter. interprets a given bytecode.
@@ -772,17 +795,25 @@ OP_CALL :
                 *r1 = other_state->return_value;
                 instruction_ptr++;
             } else {
-                //call async function in a separate thread
+                //our function
+                z_object_t *called_fnc = context_new();
                 if (function_ref->function_ref_object.is_async) {
+                    pthread_t *thread = (pthread_t *) z_alloc_or_die(sizeof(pthread_t));
+
+                    THREAD_LIST_LOCK;
+                    total_thread_count++;
+                    arraylist_push(thread_list, &thread);
+                    init_gc_barrier(total_thread_count);
+                    THREAD_LIST_UNLOCK;
+
                     z_async_fnc_args_t *args = (z_async_fnc_args_t *) z_alloc_or_die(
                             sizeof(z_async_fnc_args_t));
                     args->initial_state = initial_state;
                     args->function_ref = function_ref;
-                    run_async((void *) args);
+
+                    pthread_create(thread, NULL, run_async, args);
                     GOTO_NEXT;
                 } else {
-                    //our function
-                    z_object_t *called_fnc = context_new();
                     called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
                     called_fnc->context_object.return_context = current_context;
                     called_fnc->context_object.return_address = instruction_ptr;
@@ -862,37 +893,6 @@ end:
     z_free(byte_stream);
 #endif
     return initial_state;
-}
-
-void *run_async(void *argsv) {
-    if (threads == NULL) {
-        threads = arraylist_new(sizeof(pthread_t *));
-    }
-    pthread_t *thread = (pthread_t *) z_alloc_or_die(sizeof(pthread_t));
-    pthread_create(thread, NULL, run_async_inner, argsv);
-    arraylist_push(threads, thread);
-}
-
-void *run_async_inner(void *argsv) {
-    z_async_fnc_args_t *args = (z_async_fnc_args_t *) argsv;
-    z_interpreter_state_t *initial_state = args->initial_state;
-    z_object_t *function_ref = args->function_ref;
-    z_object_t *called_fnc = context_new();
-    z_interpreter_state_t *other_state = interpreter_state_new(called_fnc, initial_state->byte_stream,
-                                                               initial_state->fsize, initial_state->class_name, NULL,
-                                                               NULL);
-    called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
-    called_fnc->context_object.return_context = NULL;
-    called_fnc->context_object.return_address = NULL;
-    called_fnc->context_object.requested_return_register_index = NULL;
-    other_state->instruction_pointer = (function_ref->function_ref_object.start_address);
-    other_state->current_context = called_fnc;
-    z_interpreter_run(other_state);
-    z_free(argsv);
-    if (other_state->return_code != 0) {
-        error_and_exit(other_state->exception_details);
-    }
-    return NULL;
 }
 
 void goto_catch_block(const z_interpreter_state_t *initial_state,

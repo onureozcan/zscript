@@ -28,8 +28,6 @@ void gc_visit_register(z_reg_t *reg);
 uhalf_int_t gc_version = 0;
 
 int_t gc() {
-    // TODO: lock threads
-    //printf("----- GC STARTS, USED HEAP: %ld--------\n", used_heap );
     gc_version++;
     for (int_t i = 0; i < interpreter_states_list->size; i++) {
         z_interpreter_state_t *state = *(z_interpreter_state_t **) arraylist_get(interpreter_states_list, i);
@@ -47,7 +45,6 @@ int_t gc() {
     z_free(gc_objects_list->data);
     z_free(gc_objects_list);
     gc_objects_list = new_list;
-    //printf("----- GC ENDS, USED HEAP: %ld--------\n", used_heap );
 }
 
 void gc_free_object(z_object_t *object) {
