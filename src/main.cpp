@@ -77,6 +77,7 @@ int main(int argc, const char *argv[]) {
         if (event_queue) {
             wait_for_event();
         }
+        z_thread_gc_safe_end_thread();
         for (int_t i = 0; i < thread_list->size; i++) {
             pthread_t *thread = *(pthread_t **) arraylist_get(thread_list, i);
             pthread_join(*thread, NULL);

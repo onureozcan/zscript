@@ -160,6 +160,8 @@ void goto_catch_block(const z_interpreter_state_t *initial_state,
 
 void *run_async(void *argsv);
 
+void z_thread_gc_safe_end_thread();
+
 void *run_async(void *argsv) {
     z_async_fnc_args_t *args = (z_async_fnc_args_t *) (argsv);
     z_interpreter_state_t *initial_state = args->initial_state;
@@ -177,7 +179,11 @@ void *run_async(void *argsv) {
     if (other_state->return_code != 0) {
         error_and_exit(other_state->exception_details);
     }
+    z_thread_gc_safe_end_thread();
+    return NULL;
+}
 
+void z_thread_gc_safe_end_thread(){
     GC_BUSY_LOCK
     // if someone reached to gc lock, they will need us to sync. so we should do a garbage collection
     if (gc_busy) {
@@ -188,12 +194,11 @@ void *run_async(void *argsv) {
         pthread_cond_wait(&gc_busy_cond, &gc_busy_lock);
     }
     THREAD_LIST_LOCK
-    printf("quiting, thread count: %d\n", total_thread_count);
     total_thread_count--;
+    printf("quiting, thread count: %d\n", total_thread_count);
     init_gc_barrier(total_thread_count);
     THREAD_LIST_UNLOCK
     GC_BUSY_UNLOCK
-    return NULL;
 }
 
 /**
@@ -811,19 +816,23 @@ OP_CALL :
                 z_object_t *called_fnc = context_new();
                 if (function_ref->function_ref_object.is_async) {
                     pthread_t *thread = (pthread_t *) z_alloc_or_die(sizeof(pthread_t));
-
-                    THREAD_LIST_LOCK;
+                    GC_BUSY_LOCK
+                    while (gc_busy) {
+                        pthread_cond_wait(&gc_busy_cond, &gc_busy_lock);
+                    }
+                    THREAD_LIST_LOCK
                     total_thread_count++;
+                    printf("added new thread, count : %d\n",total_thread_count);
                     arraylist_push(thread_list, &thread);
                     init_gc_barrier(total_thread_count);
-                    THREAD_LIST_UNLOCK;
-
                     z_async_fnc_args_t *args = (z_async_fnc_args_t *) z_alloc_or_die(
                             sizeof(z_async_fnc_args_t));
                     args->initial_state = initial_state;
                     args->function_ref = function_ref;
 
                     pthread_create(thread, NULL, run_async, args);
+                    THREAD_LIST_UNLOCK
+                    GC_BUSY_UNLOCK
                     GOTO_NEXT;
                 } else {
                     called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
