@@ -130,6 +130,47 @@ class ImportTest(){
 
 ```
 
+- define private variables
+
+```
+// this cannot get accessed from outside this class
+class PrivateVriablesTest(){
+
+    private var privateVariable;
+
+    private function privateFnc(){
+        print("i cant be called outside this class unless accessed by an accessor :(");
+    }
+
+    function getPrivateFnc(){
+        return this.privateFnc;
+    }
+
+}
+```
+
+- asynchronous functions
+
+```
+    // async functions return immediatelly and run on a separate thread
+    async function asyncFnc(){
+        new Primetest();
+    }
+
+    // you can pass arguments
+    asyncCount(()=>{
+        print("finished async 3");
+    });
+
+     // can capture arguments in an async fnc
+    async function asyncCount(arg){
+        for(var i = 0;i<1000;i++){
+            print(i);
+        }
+        arg();
+    }
+```
+
 **run as script**:
 
 ```
