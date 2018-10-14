@@ -4,10 +4,14 @@
 int_t heap_limit = 1 * (1024 * 1024);
 int_t used_heap = 0;
 int_t total_thread_count = 1;
+int_t gc_busy = 0;
 
 pthread_mutex_t used_heap_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t gc_list_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t gc_busy_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t thread_list_lock = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_cond_t gc_busy_cond = PTHREAD_COND_INITIALIZER;
 
 pthread_barrier_t gc_safe_barrier;
 
@@ -16,6 +20,9 @@ pthread_barrier_t gc_safe_barrier;
 
 #define GC_LIST_LOCK pthread_mutex_lock(&gc_list_lock);
 #define GC_LIST_UNLOCK pthread_mutex_unlock(&gc_list_lock);
+
+#define GC_BUSY_LOCK pthread_mutex_lock(&gc_busy_lock);
+#define GC_BUSY_UNLOCK pthread_mutex_unlock(&gc_busy_lock);
 
 #define THREAD_LIST_LOCK pthread_mutex_lock(&thread_list_lock);
 #define THREAD_LIST_UNLOCK pthread_mutex_unlock(&thread_list_lock);
@@ -74,17 +81,31 @@ Z_INLINE any_ptr_t z_alloc_or_gc(size_t size) {
 }
 /*
  * //herkes nasilsa buraya gelecek
- * gc(){
+ * gc(){inux des
  *      1- giris bariyeri (diger herkesin gc noktasina ulasmasini bekle)
  *      2- main isen gc yap degilsen gc'nin bitmeisni bekle
  * }
  * */
 void schedule_gc() {
-    pthread_barrier_wait(&gc_safe_barrier);
-    if (main_thread == pthread_self()) {
+    GC_BUSY_LOCK
+    gc_busy = 1;
+    pthread_cond_broadcast(&gc_busy_cond);
+    GC_BUSY_UNLOCK
+
+    printf("awaiting gc barrier 1. thread count: %d\n",total_thread_count);
+    int ret = pthread_barrier_wait(&gc_safe_barrier);
+    puts("reached");
+    if (ret == PTHREAD_BARRIER_SERIAL_THREAD) {
         gc();
     }
+    puts("awaiting gc barrier 2");
     pthread_barrier_wait(&gc_safe_barrier);
+    puts("reached");
+
+    GC_BUSY_LOCK
+    gc_busy = 0;
+    pthread_cond_broadcast(&gc_busy_cond);
+    GC_BUSY_UNLOCK
 }
 
 void init_gc_barrier(int_t count){

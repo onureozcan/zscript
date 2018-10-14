@@ -15,7 +15,6 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
 
 char *resolveImportedClassName(char *class_name, map_t *imports_table);
 
-#include "types/string.h"
 #include "garbage_collector.h"
 
 char *class_path = 0;

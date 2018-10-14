@@ -10,7 +10,7 @@ typedef struct native_fnc_t {
 map_t *native_functions = NULL;
 
 z_reg_t *native_exit(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
-    event_queue = NULL;
+    exit((int) (stack--)->val);
     return stack;
 }
 

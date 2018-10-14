@@ -177,10 +177,22 @@ void *run_async(void *argsv) {
     if (other_state->return_code != 0) {
         error_and_exit(other_state->exception_details);
     }
+
+    GC_BUSY_LOCK
+    // if someone reached to gc lock, they will need us to sync. so we should do a garbage collection
+    if (gc_busy) {
+        schedule_gc();
+    }
+    while (gc_busy) {
+        printf("it seems that gc barrier is reached, i should await before quiting");
+        pthread_cond_wait(&gc_busy_cond, &gc_busy_lock);
+    }
     THREAD_LIST_LOCK
+    printf("quiting, thread count: %d\n", total_thread_count);
     total_thread_count--;
     init_gc_barrier(total_thread_count);
     THREAD_LIST_UNLOCK
+    GC_BUSY_UNLOCK
     return NULL;
 }
 
