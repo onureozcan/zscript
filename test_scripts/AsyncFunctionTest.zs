@@ -3,15 +3,18 @@ import "../test_scripts/primetest" as Primetest
 
 class AsyncFucntionTest(){
 
-    var a = 10;
     asyncFnc();
     synchronousFnc();
     asyncFnc2();
     asynFncWithThrow();
-    asyncFnc3();
+
+    // you can pass callback arguments
+    asyncFnc3(()=>{
+        print("finished async 3");
+    });
 
     function synchronousFnc(){
-        //these primetests both require gc and yet they should not corrupt each other's gc graph
+        //these primetests both require gc and yet they should not corrupt each other's data
         new Primetest();
     }
 
@@ -31,10 +34,13 @@ class AsyncFucntionTest(){
         print("rounded:"+Math.round(11.2));
     }
 
-    // cannot pass arguments to an async fnc
-    // they have their own stack created
-    // but they can access variables in parent scopes
-    async function asyncFnc3(){
-        print("arg:"+a);
+    // can pass arguments to an async fnc
+    async function asyncFnc3(arg){
+        for(var i = 0;i<1000;i++){
+            print(i);
+            //this will trigger gc also
+            var a = {};
+        }
+        arg();
     }
 }

@@ -147,6 +147,8 @@ Z_INLINE static char *strconcat(const char *s1, const char *s2) {
 
 typedef struct z_async_fnc_args_t {
     z_interpreter_state_t *initial_state;
+    z_reg_t *stack_start;
+    z_reg_t *stack_ptr;
     z_object_t *function_ref;
 } z_async_fnc_args_t;
 
@@ -168,8 +170,9 @@ void *run_async(void *argsv) {
     z_object_t *function_ref = args->function_ref;
     z_object_t *called_fnc = context_new();
     z_interpreter_state_t *other_state = interpreter_state_new(called_fnc, initial_state->byte_stream,
-                                                               initial_state->fsize, initial_state->class_name, NULL,
-                                                               NULL);
+                                                               initial_state->fsize, initial_state->class_name,
+                                                               args->stack_ptr,
+                                                               args->stack_start);
     ADD_ROOT_TO_GC_LIST(other_state);
     called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
     other_state->instruction_pointer = (function_ref->function_ref_object.start_address);
@@ -183,7 +186,7 @@ void *run_async(void *argsv) {
     return NULL;
 }
 
-void z_thread_gc_safe_end_thread(){
+void z_thread_gc_safe_end_thread() {
     GC_BUSY_LOCK
     // if someone reached to gc lock, they will need us to sync. so we should do a garbage collection
     if (gc_busy) {
@@ -814,6 +817,7 @@ OP_CALL :
             } else {
                 //our function
                 z_object_t *called_fnc = context_new();
+                //call async function
                 if (function_ref->function_ref_object.is_async) {
                     pthread_t *thread = (pthread_t *) z_alloc_or_die(sizeof(pthread_t));
                     GC_BUSY_LOCK
@@ -822,14 +826,17 @@ OP_CALL :
                     }
                     THREAD_LIST_LOCK
                     total_thread_count++;
-                    printf("added new thread, count : %d\n",total_thread_count);
+                    printf("added new thread, count : %d\n", total_thread_count);
                     arraylist_push(thread_list, &thread);
                     init_gc_barrier(total_thread_count);
                     z_async_fnc_args_t *args = (z_async_fnc_args_t *) z_alloc_or_die(
                             sizeof(z_async_fnc_args_t));
                     args->initial_state = initial_state;
                     args->function_ref = function_ref;
-
+                    z_reg_t *copied_stack = CREATE_STACK(stack_file_size);
+                    memcpy(copied_stack, initial_state->stack_start, stack_file_size * sizeof(z_reg_t));
+                    args->stack_start = copied_stack;
+                    args->stack_ptr = &copied_stack[(initial_state->stack_ptr - initial_state->stack_start)];
                     pthread_create(thread, NULL, run_async, args);
                     THREAD_LIST_UNLOCK
                     GC_BUSY_UNLOCK
