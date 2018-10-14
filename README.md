@@ -130,10 +130,10 @@ class ImportTest(){
 
 ```
 
-- define private variables
+- declare private variables
 
 ```
-// this cannot get accessed from outside this class
+// private variables cannot get accessed from outside this class
 class PrivateVriablesTest(){
 
     private var privateVariable;
