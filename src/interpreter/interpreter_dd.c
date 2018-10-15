@@ -83,21 +83,9 @@ interpreter_state_new(void *current_context, char *bytes, int_t len, char *class
 
 void interpreter_run_static_constructor(char *byte_stream, uint_t len, char *class_name);
 
-/**
- * get a field of an object.
- * @param saved_state saved state of the object.
- * @param field_name_to_get self explanatory.
- * @return register type.
- */
-z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_get);
+z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, z_interpreter_state_t *saved_state2, char *field_name_to_get);
 
-/**
- * set a field of an object.
- * @param saved_state saved state of the object.
- * @param field_name_to_set self explanatory.
- * @param value value of the field.
- */
-int_t interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_set, z_reg_t *value);
+int_t interpreter_set_field_virtual(z_interpreter_state_t *saved_state, z_interpreter_state_t *saved_state2, char *field_name_to_set, z_reg_t *value);
 
 map_t *get_imports_table(z_interpreter_state_t *initial_state);
 
@@ -689,7 +677,7 @@ OP_GET_FIELD_IMMEDIATE :
                     //get field from an object instance
                     object_to_search_on = (z_object_t *) r0->val;
                     z_interpreter_state_t *state = object_to_search_on->ordinary_object.saved_state;
-                    z_reg_t *prop = interpreter_get_field_virtual(state, field_name_to_get);
+                    z_reg_t *prop = interpreter_get_field_virtual(state, initial_state, field_name_to_get);
                     if (prop) {
                         *r2 = *prop;
                     } else {
@@ -770,7 +758,7 @@ OP_SET_FIELD :
                 //set field by using symbol table of this instance
                 object_to_search_on = (z_object_t *) r0->val;
                 z_interpreter_state_t *state = object_to_search_on->ordinary_object.saved_state;
-                if (interpreter_set_field_virtual(state, field_name_to_get, r2)) {
+                if (interpreter_set_field_virtual(state, initial_state, field_name_to_get, r2)) {
                     if (state->return_code) {
                         interpreter_throw_exception_from_str(initial_state, state->exception_details);
                         RETURN_IF_ERROR;
@@ -950,18 +938,20 @@ void interpreter_run_static_constructor(char *bytes, uint_t len, char *class_nam
 
 /**
  * get a field of an object.
- * @param saved_state saved state of the object.
+ * @param objects_state saved state of the object.
+ * @param objects_state saved state of our's.
  * @param field_name_to_get self explanatory.
  * @return register type.
  */
-z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_get) {
-    z_object_t *context = (z_object_t *) saved_state->root_context;
+z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *objects_state, z_interpreter_state_t *our_state,
+                                       char *field_name_to_get) {
+    z_object_t *context = (z_object_t *) objects_state->root_context;
     while (context != NULL) {
         map_t *symbol_table = context->context_object.symbol_table;
         if (!symbol_table) {
             //build symbol table
             symbol_table = build_symbol_table(
-                    saved_state->byte_stream + context->context_object.symbols_address
+                    objects_state->byte_stream + context->context_object.symbols_address
             );
             context->context_object.symbol_table = symbol_table;
         }
@@ -969,7 +959,9 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char 
         int_t *index_ptr = ((int_t *) map_get_flags(symbol_table, field_name_to_get, &flags));
         if (index_ptr) {
             if ((flags & MAP_FLAG_PRIVATE)) {
-                return NULL;
+                if (strcmp(our_state->class_name, objects_state->class_name) != 0) {
+                    return NULL;
+                }
             }
             int_t index = *index_ptr;
             return (((z_reg_t *) context->context_object.locals) + index);
@@ -982,19 +974,19 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, char 
 
 /**
  * set a field of an object.
- * @param saved_state saved state of the object.
+ * @param objects_state saved state of the object.
  * @param field_name_to_set self explanatory.
  * @param value value of the field.
  * @returns non zero if threw exception.
  */
-int_t interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *field_name_to_set, z_reg_t *value) {
-    saved_state->return_code = 0;
-    z_object_t *context = (z_object_t *) saved_state->root_context;
+int_t interpreter_set_field_virtual(z_interpreter_state_t *objects_state, z_interpreter_state_t *our_state, char *field_name_to_set, z_reg_t *value) {
+    objects_state->return_code = 0;
+    z_object_t *context = (z_object_t *) objects_state->root_context;
     map_t *symbol_table = context->context_object.symbol_table;
     if (!symbol_table) {
         //build symbol table
         symbol_table = build_symbol_table(
-                saved_state->byte_stream + context->context_object.symbols_address
+                objects_state->byte_stream + context->context_object.symbols_address
         );
         context->context_object.symbol_table = symbol_table;
     }
@@ -1002,12 +994,14 @@ int_t interpreter_set_field_virtual(z_interpreter_state_t *saved_state, char *fi
     int_t *index_ptr = ((int_t *) map_get_flags(symbol_table, field_name_to_set, &flags));
     if (index_ptr) {
         if ((flags & MAP_FLAG_PRIVATE)) {
-            interpreter_throw_exception_from_str(saved_state, "cannot set private property of object");
+            if (strcmp(our_state->class_name, objects_state->class_name) != 0) {
+                interpreter_throw_exception_from_str(objects_state, "cannot set private property of object");
+            }
         }
         int_t index = *index_ptr;
         *(((z_reg_t *) context->context_object.locals) + index) = *value;
     } else {
-        interpreter_throw_exception_from_str(saved_state, "no such property found on object");
+        interpreter_throw_exception_from_str(objects_state, "no such property found on object");
         return 1;
     }
     return 0;

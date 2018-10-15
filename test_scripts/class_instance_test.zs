@@ -59,4 +59,5 @@ class ClassInstanceTest()
     }
 
     objectWithPrivateVariables.getPrivateFnc()();
+    objectWithPrivateVariables.accessPrivateVariableFromTheSameClass();
 }
