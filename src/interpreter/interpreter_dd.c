@@ -83,9 +83,11 @@ interpreter_state_new(void *current_context, char *bytes, int_t len, char *class
 
 void interpreter_run_static_constructor(char *byte_stream, uint_t len, char *class_name);
 
-z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, z_interpreter_state_t *saved_state2, char *field_name_to_get);
+z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *saved_state, z_interpreter_state_t *saved_state2,
+                                       char *field_name_to_get);
 
-int_t interpreter_set_field_virtual(z_interpreter_state_t *saved_state, z_interpreter_state_t *saved_state2, char *field_name_to_set, z_reg_t *value);
+int_t interpreter_set_field_virtual(z_interpreter_state_t *saved_state, z_interpreter_state_t *saved_state2,
+                                    char *field_name_to_set, z_reg_t *value);
 
 map_t *get_imports_table(z_interpreter_state_t *initial_state);
 
@@ -423,7 +425,7 @@ OP_DIV :
         INIT_R2;
         if (r0->type == TYPE_NUMBER) {
             if (r1->number_val == 0) {
-                interpreter_throw_exception_from_str(initial_state, (char*)"divide by 0");
+                interpreter_throw_exception_from_str(initial_state, (char *) "divide by 0");
                 RETURN_IF_ERROR;
                 GOTO_CATCH;
             }
@@ -637,12 +639,12 @@ OP_GET_FIELD_IMMEDIATE :
             }
             //not found? maybe a static variable?
             char *class_name = (char *) initial_state->class_name;
-            z_type_info_t *type_info = (z_type_info_t*) map_get(known_types_map,class_name);
-            if (type_info){
+            z_type_info_t *type_info = (z_type_info_t *) map_get(known_types_map, class_name);
+            if (type_info) {
                 z_reg_t *prop = (z_reg_t *) map_get(type_info->static_variables, field_name_to_get);
-                    if (prop) {
-                        *r2 = *prop;
-                        GOTO_NEXT;
+                if (prop) {
+                    *r2 = *prop;
+                    GOTO_NEXT;
                 }
             }
             //not found? maybe a class constructor?
@@ -851,7 +853,7 @@ OP_CALL :
             INIT_R1;
             z_type_info_t *type_info = object_manager_get_or_load_type_info(initial_state->class_name, NULL);
             object_new(((z_object_t *) r0->val)->class_ref_object.value, type_info->imports_table,
-                                         initial_state->stack_start, initial_state->stack_ptr, r1);
+                       initial_state->stack_start, initial_state->stack_ptr, r1);
             //r1->type = TYPE_INSTANCE;
         } else {
             interpreter_throw_exception_from_str(initial_state, "callee is not a function");
@@ -912,13 +914,13 @@ OP_FFRAME :
 OP_MK_THIS :
     {
         // create 'this'
-        z_object_t* self = (z_object_t*) z_alloc_or_die(sizeof(z_object_t));
+        z_object_t *self = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
         self->ordinary_object.saved_state = initial_state;
-        self->ordinary_object.type_info = (z_type_info_t*)map_get(known_types_map,initial_state->class_name);
+        self->ordinary_object.type_info = (z_type_info_t *) map_get(known_types_map, initial_state->class_name);
         self->operations = object_operations;
         self->type = TYPE_INSTANCE;
         locals_ptr[1].type = TYPE_INSTANCE;
-        locals_ptr[1].val = (int_t)self;
+        locals_ptr[1].val = (int_t) self;
         GOTO_NEXT;
     };
 end:
@@ -997,7 +999,8 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *objects_state, z_i
  * @param value value of the field.
  * @returns non zero if threw exception.
  */
-int_t interpreter_set_field_virtual(z_interpreter_state_t *objects_state, z_interpreter_state_t *our_state, char *field_name_to_set, z_reg_t *value) {
+int_t interpreter_set_field_virtual(z_interpreter_state_t *objects_state, z_interpreter_state_t *our_state,
+                                    char *field_name_to_set, z_reg_t *value) {
     objects_state->return_code = 0;
     z_object_t *context = (z_object_t *) objects_state->root_context;
     map_t *symbol_table = context->context_object.symbol_table;

@@ -1,8 +1,7 @@
 class BinaryTree(val){
-
-    private var data = val;
-    private var left;
-    private var right;
+    var data = val;
+    var left;
+    var right;
 
     function getData(){
         return this.data;
@@ -17,24 +16,47 @@ class BinaryTree(val){
     }
 
     function add(data){
+        print("add "+ data);
         return addRecursive(this,data);
+    }
+
+    function find(data){
+        print("search "+ data);
+        return findRecursive(this,data);
+    }
+
+    private function findRecursive(current,data){
+        if (current == null){
+            print("not found:"+data);
+            return null;
+        }
+        if (data < current.data) {
+            print("search left");
+            findRecursive(current.left, data);
+        } else if (data > current.data) {
+            print("search right");
+            findRecursive(current.right, data);
+        } else {
+            print("found:"+data);
+            return current;
+        }
     }
 
     private function addRecursive(current,data){
         if(current == null){
-            print("created new");
             return new BinaryTree(data);
         }
         if (data < current.data) {
-            print("added to left");
+            print("left");
             current.left = addRecursive(current.left, data);
         } else if (data > current.data) {
-            print("added to right");
+            print("right");
             current.right = addRecursive(current.right, data);
         } else {
             // value already exists
             return current;
         }
+
         return current;
     }
 }

@@ -32,6 +32,9 @@ char *obj_to_string(void *_self) {
 
 static map_t *known_types_map = NULL;
 static native_fnc_t *native_strlen_wrapper = NULL;
+static native_fnc_t *native_str_startswith_wrapper = NULL;
+static native_fnc_t *native_str_equals_wrapper = NULL;
+static native_fnc_t *native_str_substring_wrapper = NULL;
 static native_fnc_t *native_keysize_wrapper = NULL;
 static native_fnc_t *native_keylist_wrapper = NULL;
 
@@ -62,6 +65,9 @@ void object_manager_init(char *cp) {
 
     known_types_map = map_new(sizeof(z_type_info_t));
     native_strlen_wrapper = wrap_native_fnc(native_strlen);
+    native_str_equals_wrapper = wrap_native_fnc(native_str_equals);
+    native_str_startswith_wrapper = wrap_native_fnc(native_str_startswith);
+    native_str_substring_wrapper = wrap_native_fnc(native_str_substring);
     native_keysize_wrapper = wrap_native_fnc(native_object_key_size);
     native_keylist_wrapper = wrap_native_fnc(native_object_key_list);
 
@@ -71,6 +77,12 @@ void object_manager_init(char *cp) {
     temp.type = TYPE_NATIVE_FUNC;
     temp.val = (int_t) native_strlen_wrapper;
     map_insert_non_enumerable(string_native_properties_map, "length", &temp);
+    temp.val = (int_t) native_str_startswith_wrapper;
+    map_insert_non_enumerable(string_native_properties_map, "startsWith", &temp);
+    temp.val = (int_t) native_str_equals_wrapper;
+    map_insert_non_enumerable(string_native_properties_map, "equals", &temp);
+    temp.val = (int_t) native_str_substring_wrapper;
+    map_insert_non_enumerable(string_native_properties_map, "substring", &temp);
 }
 
 /**
@@ -151,8 +163,8 @@ Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table, z_reg_t*
                 obj->ordinary_object.type_info->bytecode_stream,
                 obj->ordinary_object.type_info->bytecode_size,
                 class_name,
-                stack_start,
-                stack_ptr
+                stack_ptr,
+                stack_start
         );
         gc_fix->val = (int_t) obj;
         gc_fix->type = TYPE_INSTANCE;

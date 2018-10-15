@@ -47,6 +47,50 @@ z_reg_t *native_strlen(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
     return stack;
 }
 
+z_reg_t *native_str_equals(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
+    z_reg_t *arg = stack--;
+    char *other = 0;
+    int_t ret = 0;
+    if (arg->type != TYPE_NUMBER) {
+        other = ((z_object_t *) arg->val)->operations.to_string((void *) arg->val);
+        ret = strcmp(other, str->operations.to_string(str)) == 0;
+    }
+    return_reg->type = TYPE_NUMBER;
+    return_reg->number_val = ret;
+    return stack;
+}
+
+z_reg_t *native_str_startswith(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
+    z_reg_t *arg = stack--;
+    char *other = 0;
+    int_t ret = 0;
+    if (arg->type != TYPE_NUMBER) {
+        other = ((z_object_t *) arg->val)->operations.to_string((void *) arg->val);
+        char *this_str = str->operations.to_string(str);
+        ret = strncmp(other, this_str, strlen(other)) == 0;
+    }
+    return_reg->type = TYPE_NUMBER;
+    return_reg->number_val = ret;
+    return stack;
+}
+
+z_reg_t *native_str_substring(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
+    z_reg_t *arg = stack--;
+    char *this_str = str->operations.to_string(str);
+    if (arg->type == TYPE_NUMBER) {
+        char *new_str = (this_str + (int_t)arg->number_val);
+        char *copied = (char*) z_alloc_or_die(strlen(new_str) + 1);
+        memcpy(copied, new_str, strlen(new_str));
+        return_reg->val = (int_t) string_new(copied);
+        return_reg->type = TYPE_STR;
+        ADD_OBJECT_TO_GC_LIST(return_reg);
+        return stack;
+    }
+    return_reg->type = TYPE_NUMBER;
+    return_reg->number_val = 0;
+    return stack;
+}
+
 z_reg_t *native_object_new(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     return_reg->val = (int_t) object_new(NULL, NULL, NULL, NULL, NULL);
     return_reg->type = TYPE_OBJ;
