@@ -6,6 +6,7 @@
 #define ZEROSCRIPT_OBJECT_H
 
 typedef struct z_type_info_t {
+    char *class_name;
     char *bytecode_stream;
     int_t bytecode_size;
     map_t *static_variables;
@@ -19,6 +20,7 @@ struct operations {
 typedef struct z_object {
     uhalf_int_t gc_version;
     uhalf_int_t type;
+    uint_t freed;
     map_t *properties;
     void* key_list_cache;
     struct operations operations;

@@ -263,7 +263,8 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
             &&OP_IMPORT,
             &&OP_THROW,
             &&OP_SET_CATCH,
-            &&OP_CLEAR_CATCH
+            &&OP_CLEAR_CATCH,
+            &&OP_MK_THIS
     };
     fsize -= code_start;
     //initialize jump properties
@@ -313,8 +314,8 @@ OP_IMPORT:
     {
         INIT_R0;
         INIT_R1;
-        char *import = data + instruction_ptr->r0;
-        char *as = data + instruction_ptr->r1;
+        char *import = strdup(data + instruction_ptr->r0);
+        char *as = strdup(data + instruction_ptr->r1);
         map_insert(get_imports_table(initial_state), as, &import);
         GOTO_NEXT;
     };
@@ -330,6 +331,7 @@ OP_MOV_FNC:
         INIT_R0;
         r0->val = (int_t) function_ref_new(instruction_ptr->r1, current_context, initial_state, instruction_ptr->r2);
         r0->type = TYPE_FUNCTION_REF;
+        ADD_OBJECT_TO_GC_LIST(r0->val);
         GOTO_NEXT;
     };
 OP_MOV_STR :
@@ -340,6 +342,7 @@ OP_MOV_STR :
         strcpy(copied, str);
         r0->val = (int_t) string_new(copied);
         r0->type = TYPE_STR;
+        ADD_OBJECT_TO_GC_LIST(r0->val);
         GOTO_NEXT
     };
 OP_MOV :
@@ -355,7 +358,6 @@ OP_INC:
         INIT_R1;
         r1->number_val = (++r0->number_val);
         r1->type = TYPE_NUMBER;
-
         GOTO_NEXT;
     };
 OP_DEC:
@@ -382,6 +384,7 @@ OP_ADD :
                 z_free(num_str);
                 r2->val = (uint_t) string_new(str);
                 r2->type = TYPE_STR;
+                ADD_OBJECT_TO_GC_LIST(r2->val);
             }
         } else {
             char *ret_str = NULL;
@@ -398,6 +401,7 @@ OP_ADD :
             z_object_t *result = string_new(ret_str);
             r2->type = TYPE_STR;
             r2->val = (int_t) (result);
+            ADD_OBJECT_TO_GC_LIST(r2->val);
         }
 
         GOTO_NEXT;
@@ -419,7 +423,7 @@ OP_DIV :
         INIT_R2;
         if (r0->type == TYPE_NUMBER) {
             if (r1->number_val == 0) {
-                interpreter_throw_exception_from_str(initial_state, "divide by 0");
+                interpreter_throw_exception_from_str(initial_state, (char*)"divide by 0");
                 RETURN_IF_ERROR;
                 GOTO_CATCH;
             }
@@ -591,8 +595,7 @@ OP_GET_FIELD:
     {
         INIT_R1;
         if (r1->type == TYPE_NUMBER) {
-            z_object_t *temp = string_new(num_to_str(r1->number_val));
-            field_name_to_get = temp->operations.to_string(temp);
+            field_name_to_get = num_to_str(r1->number_val);
         } else {
             field_name_to_get = ((z_object_t *) r1->val)->operations.to_string((void *) r1->val);
         }
@@ -702,6 +705,7 @@ OP_SET_FIELD :
         if (r1->type == TYPE_NUMBER) {
             z_object_t *temp = string_new(num_to_str(r1->number_val));
             field_name_to_get = temp->operations.to_string(temp);
+            ADD_OBJECT_TO_GC_LIST(temp);
         } else {
             field_name_to_get = ((z_object_t *) r1->val)->operations.to_string((void *) r1->val);
         }
@@ -844,7 +848,7 @@ OP_CALL :
         } else if (r0->type == TYPE_CLASS_REF) {
             INIT_R1;
             z_type_info_t *type_info = object_manager_get_or_load_type_info(initial_state->class_name, NULL);
-            r1->val = (int_t) object_new(((z_object_t *) r0->val)->class_ref_object.value, type_info->imports_table,
+            object_new(((z_object_t *) r0->val)->class_ref_object.value, type_info->imports_table,
                                          initial_state->stack_start, initial_state->stack_ptr, r1);
             //r1->type = TYPE_INSTANCE;
         } else {
@@ -903,6 +907,18 @@ OP_FFRAME :
         ADD_OBJECT_TO_GC_LIST(current_context);
         GOTO_NEXT;
     }
+OP_MK_THIS :
+    {
+        // create 'this'
+        z_object_t* self = (z_object_t*) z_alloc_or_die(sizeof(z_object_t));
+        self->ordinary_object.saved_state = initial_state;
+        self->ordinary_object.type_info = (z_type_info_t*)map_get(known_types_map,initial_state->class_name);
+        self->operations = object_operations;
+        self->type = TYPE_INSTANCE;
+        locals_ptr[1].type = TYPE_INSTANCE;
+        locals_ptr[1].val = (int_t)self;
+        GOTO_NEXT;
+    };
 end:
 
 #ifdef PRE_CALCULATE_DISPATCH_POINTERS

@@ -71,6 +71,7 @@ z_reg_t *native_object_key_list(z_reg_t *stack, z_reg_t *return_reg, z_object_t 
             value_reg.val = (int_t) string_new(value);
             value_reg.type = TYPE_STR;
             map_insert(ret->properties, num_to_str(i), &value_reg);
+            ADD_OBJECT_TO_GC_LIST(value_reg.val);
         }
         object->key_list_cache = ret;
         ret->properties->is_immutable = 1;
@@ -80,6 +81,26 @@ z_reg_t *native_object_key_list(z_reg_t *stack, z_reg_t *return_reg, z_object_t 
     return stack;
 }
 
+z_reg_t *native_readln(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
+    char c;
+    size_t length = 0;
+    // for decoration
+    char *buff = (char *) Z_MALLOC(sizeof(uint_t));
+    // extremely inefficient but who cares
+    while ((c = getchar()) != -1 && c != '\n') {
+        length++;
+        buff = (char *) Z_REALLOC(buff, length + sizeof(uint_t));
+        buff[length - 1 + sizeof(uint_t)] = c;
+    }
+    USED_HEAP_LOCK
+    used_heap += length + sizeof(uint_t);
+    USED_HEAP_UNLOCK
+    buff[length + sizeof(uint_t)] = 0;
+    return_reg->val = (int_t) string_new((char *) z_decorate_ptr(buff, length));
+    return_reg->type = TYPE_STR;
+    ADD_OBJECT_TO_GC_LIST(return_reg->val);
+    return stack;
+}
 
 z_reg_t *native_print(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     z_reg_t *arg = stack--;
@@ -131,4 +152,6 @@ void z_native_funcions_init() {
     map_insert(native_functions, "enqueue", &wrapper);
     wrapper.fnc = native_exit;
     map_insert(native_functions, "exit", &wrapper);
+    wrapper.fnc = native_readln;
+    map_insert(native_functions, "readln", &wrapper);
 }

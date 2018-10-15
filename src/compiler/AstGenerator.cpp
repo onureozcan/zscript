@@ -39,7 +39,8 @@ public:
         staticConstructor->body->statements->push_back(stmt);
     }
 
-    Var *visitVarDeclaration(zeroscriptParser::VariableDeclarationPartContext *part, Body *pKind, bool isStatic, bool isPrivate) {
+    Var *visitVarDeclaration(zeroscriptParser::VariableDeclarationPartContext *part, Body *pKind, bool isStatic,
+                             bool isPrivate) {
         Var *var = new Var();
         var->setIdentifier(part->variableName->IDENT()->getText().data());
         var->isStatic = isStatic;
@@ -55,11 +56,13 @@ public:
         vector<zeroscriptParser::VariableDeclarationPartContext *> declarations = varcontext->variableDeclarationPart();
         if (varcontext->STATIC() != NULL) {
             for (int i = 0; i < declarations.size(); i++) {
-                addStaticVar(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL, varcontext->PRIVATE() != NULL));
+                addStaticVar(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL,
+                                                 varcontext->PRIVATE() != NULL));
             }
         } else {
             for (int i = 0; i < declarations.size(); i++) {
-                vars->push_back(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL, varcontext->PRIVATE() != NULL));
+                vars->push_back(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL,
+                                                    varcontext->PRIVATE() != NULL));
             }
         }
         return vars;
@@ -98,7 +101,7 @@ public:
                 return TerminalExpression::number(pContext->number()->DECIMAL()->getText().data());
             } else if (pContext->number()->INT()) {
                 return TerminalExpression::number(pContext->number()->INT()->getText().data());
-            } else if (pContext->number()->FALSE_()) {
+            } else if (pContext->number()->FALSE_() || pContext->number()->NULL_()) {
                 return TerminalExpression::number("0");
             } else if (pContext->number()->TRUE_()) {
                 return TerminalExpression::number("1");
@@ -109,6 +112,7 @@ public:
             zeroscriptParser::JsonContext *jsonObj = pContext->json();
             return visitJson(jsonObj, parentContext);
         }
+
         return nullptr;
     }
 
@@ -338,7 +342,17 @@ public:
     }
 
     Loop *visitWhileLoop(zeroscriptParser::WhileLoopContext *pContext, Body *pKind) {
-        return nullptr;
+        Loop *loop = new Loop();
+        loop->startExpr = NULL;
+        loop->condition = visitExpression(pContext->expression(), pKind);
+        if (pContext->bodyOrStatement()->body()) {
+            loop->body = visitBody(pContext->bodyOrStatement()->body(), pKind);
+        } else {
+            loop->body = new Body();
+            loop->body->statements = visitStatement(pContext->bodyOrStatement()->statement(), pKind);
+        }
+        loop->iterExpr = NULL;
+        return loop;
     }
 
     Conditional *visitConditional(zeroscriptParser::ConditionalContext *pContext, Body *pKind) {
@@ -522,6 +536,7 @@ public:
         cls = new ClassDeclaration();
         cls->body = visitBody(context->body(), NULL);
         cls->setIdentifier(context->identifier().at(0)->getText().data());
+        cls->arguments = visitArguments(context->argumentsList(),NULL);
         //hanlde imports
         for (int_t i = 0; i < context->importStmt().size(); i++) {
             std::string path = (context->importStmt(i)->STRING()->getText());

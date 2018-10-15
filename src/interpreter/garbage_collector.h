@@ -51,7 +51,6 @@ void gc_free_object(z_object_t *object) {
     switch (object->type) {
         case TYPE_STR:
             z_free(object->string_object.value);
-            z_free(object);
             break;
         case TYPE_CONTEXT:
             if (object->context_object.locals)
@@ -60,26 +59,22 @@ void gc_free_object(z_object_t *object) {
                 arraylist_free(object->context_object.catches_list);
             if (object->context_object.symbol_table)
                 map_free(object->context_object.symbol_table);
-            z_free(object);
             break;
         case TYPE_FUNCTION_REF:
-            z_free(object);
             break;
         case TYPE_CLASS_REF:
-            z_free(object);
             break;
         case TYPE_INSTANCE:
             z_free(object->ordinary_object.saved_state);
-            z_free(object);
             break;
         case TYPE_OBJ:
             map_free(object->properties);
             if (object->key_list_cache) {
                 z_free(object->key_list_cache);
             }
-            z_free(object);
             break;
     }
+    z_free(object);
 }
 
 void gc_visit_state(z_interpreter_state_t *state) {

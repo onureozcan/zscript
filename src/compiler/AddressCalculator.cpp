@@ -86,6 +86,9 @@ public:
     void calculateClass(ClassDeclaration *cls) {
         functionsStack->push(cls);
         addToCurrentTable(const_cast<char *>("this"));
+        for (int i = 0; i < cls->arguments->identifiers->size(); i++) {
+            addToCurrentTable(cls->arguments->identifiers->at(i)->data);
+        }
         calculateBody(cls->body);
     }
 

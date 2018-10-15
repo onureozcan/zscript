@@ -101,10 +101,12 @@
 //clear topmost catch point
 #define CLEAR_CATCH 39
 
-//****pseudo instructions****//
-#define COMMENT 40
+#define MAKE_THIS 40
 
-#define LABEL 41
+//****pseudo instructions****//
+#define COMMENT 41
+
+#define LABEL 42
 
 
 typedef struct z_instruction_t {

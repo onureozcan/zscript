@@ -272,7 +272,17 @@ public :
     void compileClass(ClassDeclaration *cls) {
         program->addLabel("%s", cls->identifier);
         uint_t index = program->addInstruction(FFRAME, NULL, NULL, NULL);
+        program->addInstruction(MAKE_THIS, (uint_t) NULL, (uint_t) NULL,
+                                (uint_t) NULL);
         functionsStack->push(cls);
+        int i = (int) (cls->arguments->identifiers->size()) - 1;
+        for (; i > -1; i--) {
+            char *ident = cls->arguments->identifiers->at(i)->data;
+            uint_t identReg = (uint_t) (cls->getRegister(ident));
+            program->addComment("pop arg %i (%s)", i, ident);
+            program->addInstruction(POP, identReg, (uint_t) NULL,
+                                    (uint_t) NULL);
+        }
         compileBody(cls->body);
         program->addInstruction(RETURN, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
         compileRemainingFunctions();

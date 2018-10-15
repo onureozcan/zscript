@@ -13,7 +13,7 @@ void load_class_code(const char *class_name, char **bytes, size_t *fsize);
 
 void object_manager_register_object_type(char *class_name, char *bytecodes, int_t size);
 
-char *resolveImportedClassName(char *class_name, map_t *imports_table);
+char *resolve_imported_class_name(char *class_name, map_t *imports_table);
 
 #include "garbage_collector.h"
 
@@ -84,7 +84,7 @@ z_type_info_t *object_manager_get_or_load_type_info(char *class_name, map_t *imp
     if (type_info == NULL) {
         char *bytes = 0;
         size_t fsize;
-        class_name = resolveImportedClassName(class_name, imports_table);
+        class_name = resolve_imported_class_name(class_name, imports_table);
         load_class_code(class_name, &bytes, &fsize);
         object_manager_register_object_type(class_name, bytes, fsize);
         interpreter_run_static_constructor(bytes, fsize, class_name);
@@ -93,7 +93,7 @@ z_type_info_t *object_manager_get_or_load_type_info(char *class_name, map_t *imp
     return type_info;
 }
 
-char *resolveImportedClassName(char *class_name, map_t *imports_table) {
+char *resolve_imported_class_name(char *class_name, map_t *imports_table) {
     if (imports_table != NULL) {
         char **imported_path_ptr = (char **) map_get(imports_table, class_name);
         if (imported_path_ptr != NULL) {
@@ -112,6 +112,7 @@ char *resolveImportedClassName(char *class_name, map_t *imports_table) {
 void object_manager_register_object_type(char *class_name, char *bytecodes, int_t size) {
     z_type_info_t *type_info = (z_type_info_t *) (z_alloc_or_gc(sizeof(z_type_info_t)));
     type_info->bytecode_stream = bytecodes;
+    type_info->class_name = class_name;
     type_info->bytecode_size = size;
     type_info->static_variables = map_new(sizeof(z_reg_t));
     type_info->imports_table = map_new(sizeof(char *));
@@ -133,8 +134,7 @@ Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table, z_reg_t*
     obj->gc_version = 0;
     obj->operations = object_operations;
     if (class_name) {
-        class_name = resolveImportedClassName(class_name, imports_table);
-        z_type_info_t *object_type_info = (z_type_info_t *) map_get(known_types_map, class_name);
+        z_type_info_t *object_type_info = object_manager_get_or_load_type_info(class_name,imports_table);
         char *bytes = 0;
         size_t fsize;
         if (object_type_info == NULL) {
@@ -230,7 +230,6 @@ function_ref_new(uint_t start_addr, void *parent_context, z_interpreter_state_t 
     obj->operations = object_operations;
     obj->gc_version = 0;
     obj->type = TYPE_FUNCTION_REF;
-    ADD_OBJECT_TO_GC_LIST(obj);
     return obj;
 }
 
@@ -251,7 +250,7 @@ z_object_t *string_new(char *data) {
     obj->properties = string_native_properties_map;
     obj->type = TYPE_STR;
     obj->gc_version = 0;
-    ADD_OBJECT_TO_GC_LIST(obj);
+    //ADD_OBJECT_TO_GC_LIST(obj);
     return obj;
 }
 
@@ -262,7 +261,8 @@ map_t *build_symbol_table(const char *data) {
     pos += sizeof(int_t);
     for (int_t i = 0; i < size; i++) {
         int_t value = i + 1;
-        char *item = (char *) (data + pos);
+        // used strdup because bytestream is copied and freed during calls. this will cause invalid reads from freed sections.
+        char *item = strdup((char *) (data + pos));
         uint_t size_of_item = strlen(item);
         pos += size_of_item + 2; //1 for isPrivate
         char is_private = *(char *) (data + pos - 1);
