@@ -1,3 +1,5 @@
+import "../test_scripts/primetest" as Primetest
+
 class Hello(){
 
     var helloMessage = "hello world!";
@@ -25,6 +27,10 @@ class Hello(){
 
     function fncRefTest(fncRef){
         fncRef("hi");
+    }
+
+    function runPrimeTest(){
+        new Primetest();
     }
 
 }
