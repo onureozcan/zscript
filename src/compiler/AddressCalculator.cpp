@@ -34,7 +34,7 @@ public:
         if(func->isPrivate)
             addToCurrentPrivatesMap(func->identifier);
         functionsStack->push(func);
-        addToCurrentTable(const_cast<char *>("this"));
+        //addToCurrentTable(const_cast<char *>("this"));
         addToCurrentTable(func->identifier);
         for (int i = 0; i < func->arguments->identifiers->size(); i++) {
             addToCurrentTable(func->arguments->identifiers->at(i)->data);

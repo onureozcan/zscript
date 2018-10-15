@@ -59,7 +59,7 @@ public :
                                                (uint_t) NULL);
         functionsStack->push(func);
         int i = (int) (func->arguments->identifiers->size()) - 1;
-        for (; i > -1; i--) {
+        for (i = 0; i < (int) (func->arguments->identifiers->size()); i++) {
             char *ident = func->arguments->identifiers->at(i)->data;
             uint_t identReg = (uint_t) (func->getRegister(ident));
             program->addComment("pop arg %i (%s)", i, ident);
@@ -275,8 +275,7 @@ public :
         program->addInstruction(MAKE_THIS, (uint_t) NULL, (uint_t) NULL,
                                 (uint_t) NULL);
         functionsStack->push(cls);
-        int i = (int) (cls->arguments->identifiers->size()) - 1;
-        for (; i > -1; i--) {
+        for (int i = 0; i <  (cls->arguments->identifiers->size()) ; i++) {
             char *ident = cls->arguments->identifiers->at(i)->data;
             uint_t identReg = (uint_t) (cls->getRegister(ident));
             program->addComment("pop arg %i (%s)", i, ident);

@@ -637,11 +637,13 @@ OP_GET_FIELD_IMMEDIATE :
             }
             //not found? maybe a static variable?
             char *class_name = (char *) initial_state->class_name;
-            z_type_info_t *type_info = object_manager_get_or_load_type_info(class_name, NULL);
-            z_reg_t *prop = (z_reg_t *) map_get(type_info->static_variables, field_name_to_get);
-            if (prop) {
-                *r2 = *prop;
-                GOTO_NEXT;
+            z_type_info_t *type_info = (z_type_info_t*) map_get(known_types_map,class_name);
+            if (type_info){
+                z_reg_t *prop = (z_reg_t *) map_get(type_info->static_variables, field_name_to_get);
+                    if (prop) {
+                        *r2 = *prop;
+                        GOTO_NEXT;
+                }
             }
             //not found? maybe a class constructor?
             r2->val = (int_t) class_ref_new(field_name_to_get);

@@ -1,5 +1,6 @@
 import "../test_scripts/Math" as Math
 import "../test_scripts/primetest" as Primetest
+import "../test_scripts/class_instance_test" as ClassInstanceTest
 
 class AsyncFucntionTest(){
 

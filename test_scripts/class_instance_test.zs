@@ -60,4 +60,8 @@ class ClassInstanceTest()
 
     objectWithPrivateVariables.getPrivateFnc()();
     objectWithPrivateVariables.accessPrivateVariableFromTheSameClass();
+
+    print("************ IMPORT TABLES TEST **********************");
+    helloObject.runPrimeTest();
+
 }

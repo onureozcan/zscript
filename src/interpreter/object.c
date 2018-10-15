@@ -84,11 +84,13 @@ z_type_info_t *object_manager_get_or_load_type_info(char *class_name, map_t *imp
     if (type_info == NULL) {
         char *bytes = 0;
         size_t fsize;
-        class_name = resolve_imported_class_name(class_name, imports_table);
-        load_class_code(class_name, &bytes, &fsize);
+        char* alias = class_name;
+        char* resolved = resolve_imported_class_name(class_name, imports_table);
+        load_class_code(resolved, &bytes, &fsize);
         object_manager_register_object_type(class_name, bytes, fsize);
         interpreter_run_static_constructor(bytes, fsize, class_name);
         type_info = (z_type_info_t *) map_get(known_types_map, class_name);
+        map_insert(type_info->imports_table, alias, &resolved);
     }
     return type_info;
 }
