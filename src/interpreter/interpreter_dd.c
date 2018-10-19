@@ -667,10 +667,10 @@ OP_GET_FIELD_IMMEDIATE :
     fieldNameSet:;
         uint_t lookup_object = instruction_ptr->r0;
         //first search native functions
-        z_native_fnc_t *native_fnc = (z_native_fnc_t *) map_get(native_functions, field_name_to_get);
-        if (native_fnc) {
+        z_native_fnc_t* native_fnc_ptr_ptr = (z_native_fnc_t*)map_get(native_functions, field_name_to_get);
+        if (native_fnc_ptr_ptr) {
             INIT_R2;
-            r2->val = (uint_t) native_fnc;
+            r2->val = (uint_t) (*native_fnc_ptr_ptr);
             r2->type = TYPE_NATIVE_FUNC;
         } else if (lookup_object == 1) {
         SEARCH_THIS:
@@ -841,9 +841,9 @@ OP_CALL :
         INIT_R0;
         if (r0->type == TYPE_NATIVE_FUNC) {
             //call native function
-            z_native_fnc_t *native_fnc = (z_native_fnc_t *) r0->val;
+            z_native_fnc_t native_fnc = (z_native_fnc_t ) r0->val;
             INIT_R1;
-            initial_state->stack_ptr = native_fnc->fnc(initial_state->stack_ptr, r1, object_to_search_on);
+            initial_state->stack_ptr = native_fnc(initial_state->stack_ptr, r1, object_to_search_on);
         } else if (r0->type == TYPE_FUNCTION_REF) {
             z_object_t *function_ref = (z_object_t *) r0->val;
             //someone else's function...

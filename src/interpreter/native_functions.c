@@ -1,28 +1,23 @@
 #include "object.h"
+
 //
 // Created by onur on 10.06.2018.
 //
-typedef struct z_native_fnc_t {
-    z_reg_t *(*fnc)(z_reg_t *, z_reg_t *, z_object_t *);
-} z_native_fnc_t;
+typedef z_reg_t *(*z_native_fnc_t)(z_reg_t *, z_reg_t *, z_object_t *);
 
 map_t *native_functions = NULL;
 
-void z_bind_native_function(char *function_name, z_reg_t *(*fnc)(z_reg_t *, z_reg_t *, z_object_t *)) {
-    struct z_native_fnc_t wrapper;
-    wrapper.fnc = fnc;
-    map_insert(native_functions, function_name, &wrapper);
+void z_bind_native_function(char *function_name, z_native_fnc_t fnc) {
+    map_insert(native_functions, function_name, &fnc);
 }
 
-void z_bind_native_string_function(char *function_name, z_reg_t *(*fnc)(z_reg_t *, z_reg_t *, z_object_t *)) {
-    z_native_fnc_t *wrapper = (z_native_fnc_t *) (z_alloc_or_die(sizeof(z_native_fnc_t)));
-    wrapper->fnc = fnc;
+void z_bind_native_string_function(char *function_name, z_native_fnc_t fnc) {
     if (!string_native_properties_map) {
         string_native_properties_map = map_new(sizeof(z_reg_t));
     }
     z_reg_t temp;
     temp.type = TYPE_NATIVE_FUNC;
-    temp.val = (int_t) wrapper;
+    temp.val = (int_t) fnc;
     map_insert_non_enumerable(string_native_properties_map, function_name, &temp);
 }
 
@@ -165,20 +160,27 @@ z_reg_t *native_readln(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) 
 
 z_reg_t *native_print(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     z_reg_t *arg = stack--;
-    if (arg->type == TYPE_NUMBER) {
+    switch (arg->type) {
+        case TYPE_NUMBER: {
 #ifdef FLOAT_SUPPORT
-        FLOAT val = (FLOAT) arg->number_val;
-        int_t ival = (int_t) val;
-        if (val == ival) {
-            printf("%d\n", ival);
-        } else {
-            printf("%f\n", val);
-        }
+            FLOAT val = (FLOAT) arg->number_val;
+            int_t ival = (int_t) val;
+            if (val == ival) {
+                printf("%d\n", ival);
+            } else {
+                printf("%f\n", val);
+            }
 #else
-        printf("%d\n", arg->val);
+            printf("%d\n", arg->val);
 #endif
-    } else {
-        puts(((z_object_t *) arg->val)->operations.to_string((void *) arg->val));
+            break;
+        }
+        case TYPE_STR: {
+            puts(((z_object_t *) arg->val)->string_object.value);
+            break;
+        }
+        default:
+            puts(((z_object_t *) arg->val)->operations.to_string((void *) arg->val));
     }
     return stack;
 }
@@ -190,11 +192,6 @@ z_reg_t *native_to_int(z_reg_t *stack, z_reg_t *return_reg, z_object_t *object) 
     return stack;
 }
 
-z_native_fnc_t *wrap_native_fnc(z_reg_t *(*fnc)(z_reg_t *, z_reg_t *, z_object_t *)) {
-    z_native_fnc_t *wrapper = (z_native_fnc_t *) z_alloc_or_die(sizeof(z_native_fnc_t));
-    wrapper->fnc = fnc;
-    return wrapper;
-}
 
 void z_native_funcions_init() {
     native_functions = map_new(sizeof(z_native_fnc_t));
@@ -209,8 +206,8 @@ void z_native_funcions_init() {
     z_bind_native_function("read", native_readln);
 
     z_bind_native_string_function("length", native_strlen);
-    z_bind_native_string_function( "startsWith", native_str_startswith);
-    z_bind_native_string_function( "equals", native_str_equals);
-    z_bind_native_string_function( "substring", native_str_substring);
+    z_bind_native_string_function("startsWith", native_str_startswith);
+    z_bind_native_string_function("equals", native_str_equals);
+    z_bind_native_string_function("substring", native_str_substring);
 
 }

@@ -31,10 +31,6 @@ char *obj_to_string(void *_self) {
 }
 
 static map_t *known_types_map = NULL;
-static z_native_fnc_t *native_strlen_wrapper = NULL;
-static z_native_fnc_t *native_str_startswith_wrapper = NULL;
-static z_native_fnc_t *native_str_equals_wrapper = NULL;
-static z_native_fnc_t *native_str_substring_wrapper = NULL;
 static z_native_fnc_t *native_keysize_wrapper = NULL;
 static z_native_fnc_t *native_keylist_wrapper = NULL;
 
@@ -65,13 +61,6 @@ void object_manager_init(char *cp) {
     }
 
     known_types_map = map_new(sizeof(z_type_info_t));
-    native_strlen_wrapper = wrap_native_fnc(native_strlen);
-    native_str_equals_wrapper = wrap_native_fnc(native_str_equals);
-    native_str_startswith_wrapper = wrap_native_fnc(native_str_startswith);
-    native_str_substring_wrapper = wrap_native_fnc(native_str_substring);
-    native_keysize_wrapper = wrap_native_fnc(native_object_key_size);
-    native_keylist_wrapper = wrap_native_fnc(native_object_key_list);
-
 }
 
 /**
@@ -168,9 +157,9 @@ object_new(char *class_name, map_t *imports_table, z_reg_t *stack_start, z_reg_t
     obj->type = TYPE_OBJ;
     z_reg_t temp;
     temp.type = TYPE_NATIVE_FUNC;
-    temp.val = (int_t) native_keysize_wrapper;
+    temp.val = (int_t) native_object_key_size;
     map_insert_non_enumerable(obj->properties, "size", &temp);
-    temp.val = (int_t) native_keylist_wrapper;
+    temp.val = (int_t) native_object_key_list;
     map_insert_non_enumerable(obj->properties, "keys", &temp);
     return obj;
 }
