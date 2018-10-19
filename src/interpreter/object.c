@@ -31,16 +31,16 @@ char *obj_to_string(void *_self) {
 }
 
 static map_t *known_types_map = NULL;
-static native_fnc_t *native_strlen_wrapper = NULL;
-static native_fnc_t *native_str_startswith_wrapper = NULL;
-static native_fnc_t *native_str_equals_wrapper = NULL;
-static native_fnc_t *native_str_substring_wrapper = NULL;
-static native_fnc_t *native_keysize_wrapper = NULL;
-static native_fnc_t *native_keylist_wrapper = NULL;
+static z_native_fnc_t *native_strlen_wrapper = NULL;
+static z_native_fnc_t *native_str_startswith_wrapper = NULL;
+static z_native_fnc_t *native_str_equals_wrapper = NULL;
+static z_native_fnc_t *native_str_substring_wrapper = NULL;
+static z_native_fnc_t *native_keysize_wrapper = NULL;
+static z_native_fnc_t *native_keylist_wrapper = NULL;
 
 
-char* str_to_string(void* _self){
-    return ((z_object_t*) _self)->string_object.value;
+char *str_to_string(void *_self) {
+    return ((z_object_t *) _self)->string_object.value;
 }
 
 struct operations string_operations = {
@@ -57,6 +57,7 @@ struct operations object_operations = {
 void object_manager_init(char *cp) {
     gc_objects_list = arraylist_new(sizeof(int_t));
     interpreter_states_list = arraylist_new(sizeof(int_t));
+    z_native_funcions_init();
 
     class_path = cp;
     if (cp == NULL) {
@@ -71,18 +72,6 @@ void object_manager_init(char *cp) {
     native_keysize_wrapper = wrap_native_fnc(native_object_key_size);
     native_keylist_wrapper = wrap_native_fnc(native_object_key_list);
 
-    //native string properties
-    string_native_properties_map = map_new(sizeof(z_reg_t));
-    z_reg_t temp;
-    temp.type = TYPE_NATIVE_FUNC;
-    temp.val = (int_t) native_strlen_wrapper;
-    map_insert_non_enumerable(string_native_properties_map, "length", &temp);
-    temp.val = (int_t) native_str_startswith_wrapper;
-    map_insert_non_enumerable(string_native_properties_map, "startsWith", &temp);
-    temp.val = (int_t) native_str_equals_wrapper;
-    map_insert_non_enumerable(string_native_properties_map, "equals", &temp);
-    temp.val = (int_t) native_str_substring_wrapper;
-    map_insert_non_enumerable(string_native_properties_map, "substring", &temp);
 }
 
 /**
@@ -96,8 +85,8 @@ z_type_info_t *object_manager_get_or_load_type_info(char *class_name, map_t *imp
     if (type_info == NULL) {
         char *bytes = 0;
         size_t fsize;
-        char* alias = class_name;
-        char* resolved = resolve_imported_class_name(class_name, imports_table);
+        char *alias = class_name;
+        char *resolved = resolve_imported_class_name(class_name, imports_table);
         load_class_code(resolved, &bytes, &fsize);
         object_manager_register_object_type(class_name, bytes, fsize);
         interpreter_run_static_constructor(bytes, fsize, class_name);
@@ -142,13 +131,14 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
  * @param class_name class name to load. can be null.
  * @return z_object.
  */
-Z_INLINE z_object_t *object_new(char *class_name, map_t *imports_table, z_reg_t* stack_start, z_reg_t* stack_ptr, z_reg_t* gc_fix) {
+Z_INLINE z_object_t *
+object_new(char *class_name, map_t *imports_table, z_reg_t *stack_start, z_reg_t *stack_ptr, z_reg_t *gc_fix) {
     z_object_t *obj = (z_object_t *) z_alloc_or_gc(sizeof(z_object_t));
     obj->key_list_cache = NULL;
     obj->gc_version = 0;
     obj->operations = object_operations;
     if (class_name) {
-        z_type_info_t *object_type_info = object_manager_get_or_load_type_info(class_name,imports_table);
+        z_type_info_t *object_type_info = object_manager_get_or_load_type_info(class_name, imports_table);
         char *bytes = 0;
         size_t fsize;
         if (object_type_info == NULL) {

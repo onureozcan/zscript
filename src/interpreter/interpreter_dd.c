@@ -32,10 +32,6 @@
 #define ADD_ROOT_TO_GC_LIST(c) GC_LIST_LOCK arraylist_push(interpreter_states_list,&(c)); GC_LIST_UNLOCK
 #define CREATE_STACK(s) (z_reg_t *) (z_alloc_or_die((s) * sizeof(z_reg_t)));
 
-#ifdef FLOAT_SUPPORT
-#else
-#endif
-
 
 typedef struct z_reg_t {
     int_t type;
@@ -183,12 +179,12 @@ void z_thread_gc_safe_end_thread() {
         schedule_gc();
     }
     while (gc_busy) {
-        printf("it seems that gc barrier is reached, i should await before quiting");
+        //printf("it seems that gc barrier is reached, i should await before quiting");
         pthread_cond_wait(&gc_busy_cond, &gc_busy_lock);
     }
     THREAD_LIST_LOCK
     total_thread_count--;
-    printf("quiting, thread count: %d\n", total_thread_count);
+    //printf("quiting, thread count: %d\n", total_thread_count);
     init_gc_barrier(total_thread_count);
     THREAD_LIST_UNLOCK
     GC_BUSY_UNLOCK
@@ -209,10 +205,6 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
 #endif
     int_t fsize = initial_state->fsize;
     z_object_t *current_context = (z_object_t *) initial_state->current_context;
-
-    if (!native_functions) {
-        z_native_funcions_init();
-    }
 
     char *field_name_to_get;
 
@@ -250,23 +242,33 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
             &&OP_PUSH,
             &&OP_POP,
             &&OP_RETURN,
-            &&OP_HLT,
+            &&OP_RETURN_I,
             &&OP_NOP,
             &&OP_FFRAME,
             &&OP_INC,
             &&OP_DEC,
             &&OP_MOV_FNC,
+            //start compare and jump group
             &&OP_JL,
             &&OP_JG,
             &&OP_JLE,
             &&OP_JGE,
             &&OP_JE,
             &&OP_JNE,
+            // end compare and jump group
+            // start immediate compare and jmp group
+            &&OP_JL_I,
+            &&OP_JG_I,
+            &&OP_JLE_I,
+            &&OP_JGE_I,
+            &&OP_JE_I,
+            &&OP_JNE_I,
+            // end immediate compare and jmp group
             &&OP_IMPORT,
             &&OP_THROW,
             &&OP_SET_CATCH,
             &&OP_CLEAR_CATCH,
-            &&OP_MK_THIS
+            &&OP_CREATE_THIS
     };
     fsize -= code_start;
     //initialize jump properties
@@ -285,6 +287,7 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
         instruction_ptr = (z_instruction_t *) (byte_stream + initial_state->instruction_pointer);
     }
     initial_state->return_code = 0;
+
     GOTO_CURRENT;
 OP_SET_CATCH:
     {
@@ -358,7 +361,7 @@ OP_INC:
     {
         INIT_R0;
         INIT_R1;
-        r1->number_val = (++r0->number_val);
+        r1->number_val = (r0->number_val + 1);
         r1->type = TYPE_NUMBER;
         GOTO_NEXT;
     };
@@ -366,7 +369,7 @@ OP_DEC:
     {
         INIT_R0;
         INIT_R1;
-        r1->number_val = (--r0->number_val);
+        r1->number_val = (r0->number_val -1);
         r1->type = TYPE_NUMBER;
         GOTO_NEXT;
     };
@@ -423,15 +426,13 @@ OP_DIV :
         INIT_R0;
         INIT_R1;
         INIT_R2;
-        if (r0->type == TYPE_NUMBER) {
-            if (r1->number_val == 0) {
-                interpreter_throw_exception_from_str(initial_state, (char *) "divide by 0");
-                RETURN_IF_ERROR;
-                GOTO_CATCH;
-            }
-            r2->number_val = ((r0->number_val) / (r1->number_val));
-            r2->type = TYPE_NUMBER;
+        if (r1->number_val == 0) {
+            interpreter_throw_exception_from_str(initial_state, (char *) "divide by 0");
+            RETURN_IF_ERROR;
+            GOTO_CATCH;
         }
+        r2->number_val = ((r0->number_val) / (r1->number_val));
+        r2->type = TYPE_NUMBER;
         GOTO_NEXT;
     };
 OP_MUL :
@@ -439,10 +440,8 @@ OP_MUL :
         INIT_R0;
         INIT_R1;
         INIT_R2;
-        if (r0->type == TYPE_NUMBER) {
-            r2->number_val = ((r0->number_val) * (r1->number_val));
-            r2->type = TYPE_NUMBER;
-        }
+        r2->number_val = ((r0->number_val) * (r1->number_val));
+        r2->type = TYPE_NUMBER;
         GOTO_NEXT
     };
 OP_MOD :
@@ -593,6 +592,65 @@ OP_JNE :
         }
         GOTO_NEXT
     };
+OP_JL_I :
+    {
+        INIT_R0;
+        INIT_R1;
+        if (((r0->number_val) < (instruction_ptr->r1_float))) {
+            instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
+            GOTO_CURRENT;
+        }
+        GOTO_NEXT
+    };
+OP_JLE_I :
+    {
+        INIT_R0;
+        INIT_R1;
+        if (((r0->number_val) <= (instruction_ptr->r1_float))) {
+            instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
+            GOTO_CURRENT;
+        }
+        GOTO_NEXT
+    };
+OP_JG_I :
+    {
+        INIT_R0;
+        INIT_R1;
+        if (((r0->number_val) > (instruction_ptr->r1_float))) {
+            instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
+            GOTO_CURRENT;
+        }
+        GOTO_NEXT
+    };
+OP_JGE_I :
+    {
+        INIT_R0;
+        INIT_R1;
+        if (((r0->number_val) >= (instruction_ptr->r1_float))) {
+            instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
+            GOTO_CURRENT;
+        }
+        GOTO_NEXT
+    };
+OP_JE_I :
+    {
+        INIT_R0;
+        INIT_R1;
+        if (r0->val == instruction_ptr->r1) {
+            instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
+            GOTO_CURRENT;
+        }
+        GOTO_NEXT
+    };
+OP_JNE_I :
+    {
+        INIT_R0;
+        if (r0->val != instruction_ptr->r1) {
+            instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
+            GOTO_CURRENT;
+        }
+        GOTO_NEXT
+    };
 OP_GET_FIELD:
     {
         INIT_R1;
@@ -609,12 +667,12 @@ OP_GET_FIELD_IMMEDIATE :
     fieldNameSet:;
         uint_t lookup_object = instruction_ptr->r0;
         //first search native functions
-        native_fnc_t *native_fnc = (native_fnc_t *) map_get(native_functions, field_name_to_get);
+        z_native_fnc_t *native_fnc = (z_native_fnc_t *) map_get(native_functions, field_name_to_get);
         if (native_fnc) {
             INIT_R2;
             r2->val = (uint_t) native_fnc;
             r2->type = TYPE_NATIVE_FUNC;
-        } else if (!lookup_object) {
+        } else if (lookup_object == 1) {
         SEARCH_THIS:
             INIT_R2;
             //search `this`
@@ -783,7 +841,7 @@ OP_CALL :
         INIT_R0;
         if (r0->type == TYPE_NATIVE_FUNC) {
             //call native function
-            native_fnc_t *native_fnc = (native_fnc_t *) r0->val;
+            z_native_fnc_t *native_fnc = (z_native_fnc_t *) r0->val;
             INIT_R1;
             initial_state->stack_ptr = native_fnc->fnc(initial_state->stack_ptr, r1, object_to_search_on);
         } else if (r0->type == TYPE_FUNCTION_REF) {
@@ -881,20 +939,20 @@ OP_RETURN :
         uint_t return_reg = current_context->context_object.requested_return_register_index;
         initial_state->current_context = current_context;
         current_context = (z_object_t *) current_context->context_object.return_context;
-        initial_state->return_value = *actual_return_reg;
         if (current_context == NULL) {
-            goto end;
+            initial_state->return_value = *actual_return_reg;
             initial_state->return_code = 0;
+            goto end;
         }
         locals_ptr = (z_reg_t *) current_context->context_object.locals;
         z_reg_t *requested_return_reg = (return_reg + locals_ptr);
         *requested_return_reg = *actual_return_reg;
         GOTO_NEXT;
     };
-OP_HLT :
+OP_RETURN_I :
     {
-        goto end;
-    }
+
+    };
 OP_NOP :
     {
         GOTO_NEXT;
@@ -905,13 +963,19 @@ OP_FFRAME :
         uint_t byte_size_locals = sizeof(z_reg_t) * (sizeof_locals + 1);
         locals_ptr = (z_reg_t *) z_alloc_or_die(byte_size_locals);
         memset(locals_ptr, 0, byte_size_locals);
+
+        // place this variable
+        z_object_t *root_context = (z_object_t *) (initial_state->root_context);
+        if (root_context->context_object.locals != NULL)
+            locals_ptr[1] = ((z_reg_t *) root_context->context_object.locals)[1];
+
         current_context->context_object.locals = locals_ptr;
         current_context->context_object.locals_count = sizeof_locals + 1;
         current_context->context_object.symbols_address = instruction_ptr->r1;
         ADD_OBJECT_TO_GC_LIST(current_context);
         GOTO_NEXT;
     }
-OP_MK_THIS :
+OP_CREATE_THIS :
     {
         // create 'this'
         z_object_t *self = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));

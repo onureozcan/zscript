@@ -27,7 +27,11 @@ typedef uint32_t uhalf_int_t;
 typedef int32_t half_int_t;
 typedef uint16_t uquarter_int_t;
 typedef int16_t quarter_int_t;
-typedef double FLOAT;
+#ifdef FLOAT_SUPPORT
+typedef float FLOAT;
+#else
+typedef int_t FLOAT;
+#endif
 #endif
 
 #endif //ZEROSCRIPT_TYPES_H

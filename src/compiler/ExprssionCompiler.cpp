@@ -37,7 +37,7 @@ class ExpressionCompiler {
 public:
     uint_t compilePostfix(PostfixExpression *pExpression, uint_t requestedDestinationRegister = 0) {
         uint_t leftReg = (uint_t) compileExpression(pExpression->expr);
-        uint_t target = requestedDestinationRegister == 0 ? getRegister(NULL) : requestedDestinationRegister;
+        uint_t target = requestedDestinationRegister == 0 ? leftReg : requestedDestinationRegister;
         program->addInstruction(MOV, target, leftReg, NULL);
         if (strcmp(pExpression->op, "++") == 0) {
             program->addInstruction(INC, leftReg, leftReg, NULL);
@@ -109,7 +109,7 @@ public:
             temp->type = TerminalExpression::TYPE_STRING;
             temp->data = identifier;
             uint_t str_reg = compileTerminal(temp);
-            program->addInstruction(GET_FIELD, 0, (uint_t) (str_reg),
+            program->addInstruction(GET_FIELD, 1, (uint_t) (str_reg),
                                     (uint_t) (tempRegister));
         }
         return tempRegister;
@@ -122,7 +122,7 @@ public:
             if (destinationRegister == 0)
                 tempRegister = getRegister(NULL);
             else tempRegister = destinationRegister;
-            program->addInstruction(GET_FIELD_IMMEDIATE, 0, (uint_t)(identifier),
+            program->addInstruction(GET_FIELD_IMMEDIATE, 1, (uint_t)(identifier),
                                     (uint_t) (tempRegister));
         }
         return tempRegister;
@@ -193,12 +193,12 @@ public:
         return resultReg;
     }
 
-    uint_t compileTerminal(TerminalExpression *right, uint_t destionationRegister = 0, int_t has_lookup_object = 0) {
+    uint_t compileTerminal(TerminalExpression *right, uint_t destinationRegister = 0, int_t has_lookup_object = 0) {
         if (right->type == TerminalExpression::TYPE_IDENTIFIER) {
-            if (has_lookup_object) compileIdentifier(right->data);
-            return compileIdentifierImmediate(right->data);
+            if (has_lookup_object) compileIdentifier(right->data, destinationRegister);
+            return compileIdentifierImmediate(right->data,destinationRegister);
         }
-        uint_t reg = destionationRegister;
+        uint_t reg = destinationRegister;
         if (reg == 0) reg = getRegister(NULL);
         if (right->type == TerminalExpression::TYPE_NUMBER) {
             program->addInstruction(MOV_NUMBER, (uint_t) (reg), (uint_t) right->data,

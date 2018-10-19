@@ -52,7 +52,7 @@ Z_INLINE void z_free(any_ptr_t ptr) {
     Z_FREE(z_undecorate_ptr(ptr));
 }
 
-Z_INLINE any_ptr_t z_alloc_or_die(size_t size) {
+any_ptr_t z_alloc_or_die(size_t size) {
     size += sizeof(uint_t);
     USED_HEAP_LOCK
     used_heap += size;
@@ -64,7 +64,7 @@ Z_INLINE any_ptr_t z_alloc_or_die(size_t size) {
     return z_decorate_ptr(ptr, size);
 }
 
-Z_INLINE any_ptr_t z_alloc_or_gc(size_t size) {
+any_ptr_t z_alloc_or_gc(size_t size) {
     size += sizeof(uint_t);
     USED_HEAP_LOCK
     used_heap += size;
@@ -91,16 +91,16 @@ void schedule_gc() {
     gc_busy = 1;
     pthread_cond_broadcast(&gc_busy_cond);
     GC_BUSY_UNLOCK
-
-    printf("awaiting gc barrier 1. thread count: %d\n",total_thread_count);
+//
+//    printf("awaiting gc barrier 1. thread count: %d\n",total_thread_count);
     int ret = pthread_barrier_wait(&gc_safe_barrier);
-    puts("reached");
+//    puts("reached");
     if (ret == PTHREAD_BARRIER_SERIAL_THREAD) {
         gc();
     }
-    puts("awaiting gc barrier 2");
+//    puts("awaiting gc barrier 2");
     pthread_barrier_wait(&gc_safe_barrier);
-    puts("reached");
+//    puts("reached");
 
     GC_BUSY_LOCK
     gc_busy = 0;

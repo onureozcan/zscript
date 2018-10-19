@@ -5,7 +5,6 @@
 #ifndef ZEROSCRIPT_PROGRAM_H
 #define ZEROSCRIPT_PROGRAM_H
 
-#include "stdio.h"
 #include "instruction.h"
 
 typedef struct z_program_t {

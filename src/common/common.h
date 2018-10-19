@@ -5,20 +5,13 @@
 #ifndef ZEROSCRIPT_COMMON_H
 #define ZEROSCRIPT_COMMON_H
 
-#define Z_INLINE
+#define Z_INLINE inline
 #define Z_MALLOC malloc
 #define Z_REALLOC realloc
 #define Z_FREE free
 #define FLOAT_SUPPORT
 #define TRUE 1
 #define FALSE 0
-
-pthread_t main_thread;
-
-long timestamp()
-{
-    return (long) clock();
-}
 
 #include <stdarg.h>
 #include <stdio.h>

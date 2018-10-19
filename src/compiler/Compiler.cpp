@@ -34,11 +34,15 @@ public :
     Compiler(ClassDeclaration *ast) {
         this->cls = ast;
         AddressCalculator *addressCalculator = new AddressCalculator(ast);
-        // ast->print();
+        //ast->print();
         compileClass((ast));
-        // program->print();
+        program->optimize();
+        //program->print();
+        //exit(0);
         Assembler assembler;
         bytes = assembler.toBytes(program, &len);
+        arraylist_free(program->instructions);
+        delete(addressCalculator);
     }
 
     char *toBytes(size_t *len) {
@@ -46,9 +50,9 @@ public :
         return bytes;
     }
 
-    uint_t compileExpression(Expression *pExpr) {
+    uint_t compileExpression(Expression *pExpr, uint_t requestedDestinationRegister = 0) {
         ExpressionCompiler *expressionCompiler = new ExpressionCompiler(program, functionsStack->top());
-        uint_t ret = expressionCompiler->compileExpression(pExpr);
+        uint_t ret = expressionCompiler->compileExpression(pExpr, requestedDestinationRegister);
         delete (expressionCompiler);
         return ret;
     }
@@ -80,7 +84,7 @@ public :
                 program->addInstruction(IMPORT_CLS, (uint_t) first, (uint_t) second, NULL);
             }
             uint_t staticsRegister = static_cast<uint_t>(getRegister(NULL));
-            program->addInstruction(GET_FIELD_IMMEDIATE, 0, (uint_t) "__static__", staticsRegister);
+            program->addInstruction(GET_FIELD_IMMEDIATE, 1, (uint_t) "__static__", staticsRegister);
             uint_t fncNameRegister = static_cast<uint_t>(getRegister(NULL));
             uint_t fncRefRegister = static_cast<uint_t>(getRegister(NULL));
             for (int_t i = 0; i < compiledStaticFunctions->size(); i++) {
@@ -158,7 +162,8 @@ public :
         freeRegister(cond_reg);
         compileBody(pConditional->body);
         if (pConditional->elseBody) {
-            program->addInstruction(NOP, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
+            // why are you here?
+            // program->addInstruction(NOP, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
             program->addInstruction(JMP, (uint_t) con_end_label, (uint_t) NULL,
                                     (uint_t) NULL);
         }
@@ -171,15 +176,17 @@ public :
 
     void compileVar(Var *pVar) {
         uint_t reg = (uint_t) getRegister(pVar->identifier);
-        uint_t valueReg = compileExpression(pVar->value);
-        program->addInstruction(MOV, reg, valueReg, (uint_t) NULL);
-        freeRegister(valueReg);
+        uint_t valueReg = compileExpression(pVar->value, reg);
+        if (valueReg - reg) {
+            program->addInstruction(MOV, reg, valueReg, (uint_t) NULL);
+            freeRegister(valueReg);
+        }
     }
 
     void compileTryCatch(TryCatch *pCatch) {
         // push this finally block so that it appears before return
         if (pCatch->finallyBody)
-            arraylist_push(finallyBlocksToPrependReturn,pCatch);
+            arraylist_push(finallyBlocksToPrependReturn, pCatch);
         char *catchLabel = (char *) malloc(100);
         char *finallyLabel = (char *) malloc(100);
         snprintf(catchLabel, 100, ".catch_%d", ++labelCount);
@@ -227,8 +234,8 @@ public :
             if (statement->hasReturn) {
                 //this loop compiler every finally block in the lexical scope before return statement appears.
                 program->addComment(" prepend finally blocks", reg);
-                for(int_t i=0;i< finallyBlocksToPrependReturn->size;i++){
-                    compileBody(((TryCatch*)arraylist_get(finallyBlocksToPrependReturn,i))->finallyBody);
+                for (int_t i = 0; i < finallyBlocksToPrependReturn->size; i++) {
+                    compileBody(((TryCatch *) arraylist_get(finallyBlocksToPrependReturn, i))->finallyBody);
                 }
                 program->addComment(" return %d", reg);
                 program->addInstruction(RETURN, reg, (uint_t) NULL, (uint_t) NULL);
@@ -272,10 +279,10 @@ public :
     void compileClass(ClassDeclaration *cls) {
         program->addLabel("%s", cls->identifier);
         uint_t index = program->addInstruction(FFRAME, NULL, NULL, NULL);
-        program->addInstruction(MAKE_THIS, (uint_t) NULL, (uint_t) NULL,
+        program->addInstruction(CREATE_THIS, (uint_t) NULL, (uint_t) NULL,
                                 (uint_t) NULL);
         functionsStack->push(cls);
-        for (int i = 0; i <  (cls->arguments->identifiers->size()) ; i++) {
+        for (int i = 0; i < (cls->arguments->identifiers->size()); i++) {
             char *ident = cls->arguments->identifiers->at(i)->data;
             uint_t identReg = (uint_t) (cls->getRegister(ident));
             program->addComment("pop arg %i (%s)", i, ident);
@@ -286,7 +293,7 @@ public :
         program->addInstruction(RETURN, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
         compileRemainingFunctions();
         uint_t locals_count = cls->registerTable->size() + cls->symbolTable->size();
-        z_instruction_t* fframe = (z_instruction_t *) arraylist_get(program->instructions, index);
+        z_instruction_t *fframe = (z_instruction_t *) arraylist_get(program->instructions, index);
         //set args of FFRAME
         fframe->r0 = locals_count;
         //this will later be used to assemble required information

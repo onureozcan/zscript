@@ -92,7 +92,7 @@ class Assembler {
         for (uint_t i = 0; i < program->instructions->size; i++) {
             z_instruction_t instruction = *((z_instruction_t *) arraylist_get(program->instructions, i));
             if (instruction.opcode != COMMENT && instruction.opcode != LABEL) {
-                if (instruction.opcode >= JMP_LESS && instruction.opcode <= JMP_N_EQUAL) {
+                if (instruction.opcode >= JMP_LESS && instruction.opcode <= JMP_N_EQUAL_I) {
                     instruction.r2 = label_position_map[(char *) instruction.r2];
                 } else if (instruction.opcode == JMP_NOT_TRUE || instruction.opcode == JMP_TRUE) {
                     instruction.r1 = label_position_map[(char *) instruction.r1];
@@ -110,7 +110,7 @@ class Assembler {
 
                 addData((char *) &opcode, sizeof(uint_t));
                 addData((char *) &r0, sizeof(uint_t));
-                if (instruction.opcode == MOV_NUMBER) {
+                if (instruction.opcode == MOV_NUMBER || (instruction.opcode >= JMP_LESS_I && instruction.opcode <= JMP_N_EQUAL_I)) {
 #ifdef FLOAT_SUPPORT
                     FLOAT num = 0;
 #else

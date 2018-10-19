@@ -60,7 +60,6 @@ int main(int argc, const char *argv[]) {
     object_manager_init(class_path);
     if (runMode) {
         clock_t begin = clock();
-        main_thread = pthread_self();
         pthread_barrier_init(&gc_safe_barrier, NULL, 1);
         thread_list = arraylist_new(sizeof(int_t));
         char *class_name = (char *) (z_alloc_or_gc(strlen(filename) + 1));

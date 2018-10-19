@@ -1,7 +1,6 @@
 import "../test_scripts/BinaryTree" as BinaryTree
 
 class Osman(){
-
    var root = null;
 
    print("put <number> to insert a node");
@@ -10,13 +9,14 @@ class Osman(){
 
    while(true){
 
-       var line = readln();
+       var line = read();
 
         if(line.equals("q")){
             exit(0);
         } else if (line.startsWith("put")){
             var num = number(line.substring(3));
             if(root == null){
+                print("root null, creating");
                 root = new BinaryTree(num);
             } else {
                 root.add(num);

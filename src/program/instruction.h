@@ -57,7 +57,7 @@
 
 #define RETURN 23
 
-#define HLT 24
+#define RETURN_I 24
 
 #define NOP 25
 
@@ -88,25 +88,43 @@
 //jump to r2 if r0 != r1
 #define JMP_N_EQUAL 35
 
+//jump to r2 if r0 < i1
+#define JMP_LESS_I 36
+
+//jump to r2 if r0 > i1
+#define JMP_GREATER_I 37
+
+//jump to r2 if r0 > i1
+#define JMP_LESS_OR_EQUAL_I 38
+
+//jump to r2 if r0 > i1
+#define JMP_GREATER_OR_EQUAL_I 39
+
+//jump to r2 if r0 == i1
+#define JMP_EQUAL_I 40
+
+//jump to r2 if r0 != i1
+#define JMP_N_EQUAL_I 41
+
 //import table builder
-#define IMPORT_CLS 36
+#define IMPORT_CLS 42
 
 
 //throw r0
-#define THROW_EXCEPTION 37
+#define THROW_EXCEPTION 43
 
 //set catch point at r0
-#define SET_CATCH 38
+#define SET_CATCH 44
 
 //clear topmost catch point
-#define CLEAR_CATCH 39
+#define CLEAR_CATCH 45
 
-#define MAKE_THIS 40
+#define CREATE_THIS 46
 
 //****pseudo instructions****//
-#define COMMENT 41
+#define COMMENT 47
 
-#define LABEL 42
+#define LABEL 48
 
 
 typedef struct z_instruction_t {
@@ -131,12 +149,17 @@ z_instruction_t *instruction_new(uint_t opcode, uint_t r0, uint_t r1, uint_t r2)
 static const char *name_opcode(uint_t opcode);
 
 void instruction_print(z_instruction_t instruction) {
-    if (instruction.opcode == SET_CATCH) {
-        printf("\t%-5s %-5s", name_opcode(SET_CATCH),(char*)(instruction.r0));
+    if (instruction.opcode == CREATE_THIS) {
+        printf("\tcreate_this");
+    } else if (instruction.opcode == SET_CATCH) {
+        printf("\t%-5s %-5s", name_opcode(SET_CATCH), (char *) (instruction.r0));
     } else if (instruction.opcode == CLEAR_CATCH) {
         printf("\t%-5s", name_opcode(CLEAR_CATCH));
     } else if (instruction.opcode >= JMP_LESS && instruction.opcode <= JMP_N_EQUAL) {
         printf("\t%-5s $%-5d $%-5d %-5s ", name_opcode(instruction.opcode), (int) instruction.r0, (int) instruction.r1,
+               (char *) instruction.r2);
+    }  else if (instruction.opcode >= JMP_LESS_I && instruction.opcode <= JMP_N_EQUAL_I) {
+        printf("\t%-5s $%-5d %-5s %-5s ", name_opcode(instruction.opcode), (int) instruction.r0, (char*) instruction.r1,
                (char *) instruction.r2);
     } else if (instruction.opcode == THROW_EXCEPTION) {
         printf("\t%s $%-5d", name_opcode(instruction.opcode), (int) (instruction.r0));
@@ -156,8 +179,10 @@ void instruction_print(z_instruction_t instruction) {
     } else if (instruction.opcode == GET_FIELD_IMMEDIATE) {
         printf("\t%-5s $%-5d %-5s $%-5d", name_opcode(instruction.opcode), (int) instruction.r0,
                (char *) instruction.r1, (int) instruction.r2);
-    } else if (instruction.opcode == RETURN || instruction.opcode == NOP) {
+    } else if (instruction.opcode == RETURN) {
         printf("\t%-5s $%-5d ", name_opcode(instruction.opcode), (int) instruction.r0);
+    } else if (instruction.opcode == RETURN_I) {
+        printf("\t%-5s %-5d ", name_opcode(instruction.opcode), (int) instruction.r0);
     } else if (instruction.opcode == JMP_TRUE || instruction.opcode == JMP_NOT_TRUE) {
         printf("\t%-5s $%-5d %-5s ", name_opcode(instruction.opcode), (int) instruction.r0, (char *) instruction.r1);
     } else if (instruction.opcode == JMP) {
@@ -194,6 +219,18 @@ static const char *name_opcode(uint_t opcode) {
             return "jne";
         case JMP_LESS:
             return "jl";
+        case JMP_GREATER_OR_EQUAL_I:
+            return "jge_i";
+        case JMP_GREATER_I:
+            return "jg_i";
+        case JMP_LESS_OR_EQUAL_I:
+            return "jle_i";
+        case JMP_EQUAL_I:
+            return "je_i";
+        case JMP_N_EQUAL_I:
+            return "jne_i";
+        case JMP_LESS_I:
+            return "jl_i";
         case DEC:
             return "dec";
         case INC:
@@ -250,8 +287,8 @@ static const char *name_opcode(uint_t opcode) {
             return "call";
         case RETURN:
             return "ret";
-        case HLT:
-            return "hlt";
+        case RETURN_I:
+            return "ret_i";
         case PUSH:
             return "push";
         case POP:

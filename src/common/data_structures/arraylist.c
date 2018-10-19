@@ -10,24 +10,28 @@ typedef struct arraylist_t {
     size_t size_of_item;
 } arraylist_t;
 
-//private functions
 Z_INLINE static void extend_capacity(arraylist_t *self);
 
-//public functions
+arraylist_t *arraylist_new_capacity(size_t sizeof_item, int_t initial_capacity) {
+    arraylist_t *self = (arraylist_t *) z_alloc_or_die(sizeof(arraylist_t));
+    self->capacity = initial_capacity;
+    self->size_of_item = sizeof_item;
+    self->data = (char *) z_alloc_or_die(sizeof_item * initial_capacity);
+    self->size = 0;
+    self->top = &self->data[0];
+    return self;
+}
+
 /**
  * initializes a new arraylist.
  * @param sizeof_item size of an item in the list.
  * @return arraylist ptr.
  */
 arraylist_t *arraylist_new(size_t sizeof_item) {
-    arraylist_t *self = (arraylist_t *) z_alloc_or_die(sizeof(arraylist_t));
-    self->capacity = ARRAY_LIST_INITIAL_CAPACITY;
-    self->size_of_item = sizeof_item;
-    self->data = (char *) z_alloc_or_die(sizeof_item * ARRAY_LIST_INITIAL_CAPACITY);
-    self->size = 0;
-    self->top = &self->data[0];
-    return self;
+    return arraylist_new_capacity(sizeof_item, ARRAY_LIST_INITIAL_CAPACITY);
 }
+
+
 
 /**
  * add an item to the list.

@@ -2,12 +2,29 @@
 //
 // Created by onur on 10.06.2018.
 //
-typedef struct native_fnc_t {
+typedef struct z_native_fnc_t {
     z_reg_t *(*fnc)(z_reg_t *, z_reg_t *, z_object_t *);
-} native_fnc_t;
-
+} z_native_fnc_t;
 
 map_t *native_functions = NULL;
+
+void z_bind_native_function(char *function_name, z_reg_t *(*fnc)(z_reg_t *, z_reg_t *, z_object_t *)) {
+    struct z_native_fnc_t wrapper;
+    wrapper.fnc = fnc;
+    map_insert(native_functions, function_name, &wrapper);
+}
+
+void z_bind_native_string_function(char *function_name, z_reg_t *(*fnc)(z_reg_t *, z_reg_t *, z_object_t *)) {
+    z_native_fnc_t *wrapper = (z_native_fnc_t *) (z_alloc_or_die(sizeof(z_native_fnc_t)));
+    wrapper->fnc = fnc;
+    if (!string_native_properties_map) {
+        string_native_properties_map = map_new(sizeof(z_reg_t));
+    }
+    z_reg_t temp;
+    temp.type = TYPE_NATIVE_FUNC;
+    temp.val = (int_t) wrapper;
+    map_insert_non_enumerable(string_native_properties_map, function_name, &temp);
+}
 
 z_reg_t *native_exit(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     exit((int) (stack--)->val);
@@ -78,8 +95,8 @@ z_reg_t *native_str_substring(z_reg_t *stack, z_reg_t *return_reg, z_object_t *s
     z_reg_t *arg = stack--;
     char *this_str = str->operations.to_string(str);
     if (arg->type == TYPE_NUMBER) {
-        char *new_str = (this_str + (int_t)arg->number_val);
-        char *copied = (char*) z_alloc_or_die(strlen(new_str) + 1);
+        char *new_str = (this_str + (int_t) arg->number_val);
+        char *copied = (char *) z_alloc_or_die(strlen(new_str) + 1);
         memcpy(copied, new_str, strlen(new_str));
         return_reg->val = (int_t) string_new(copied);
         return_reg->type = TYPE_STR;
@@ -173,29 +190,27 @@ z_reg_t *native_to_int(z_reg_t *stack, z_reg_t *return_reg, z_object_t *object) 
     return stack;
 }
 
-native_fnc_t *wrap_native_fnc(z_reg_t *(*fnc)(z_reg_t *, z_reg_t *, z_object_t *)) {
-    native_fnc_t *wrapper = (native_fnc_t *) z_alloc_or_die(sizeof(native_fnc_t));
+z_native_fnc_t *wrap_native_fnc(z_reg_t *(*fnc)(z_reg_t *, z_reg_t *, z_object_t *)) {
+    z_native_fnc_t *wrapper = (z_native_fnc_t *) z_alloc_or_die(sizeof(z_native_fnc_t));
     wrapper->fnc = fnc;
     return wrapper;
 }
 
 void z_native_funcions_init() {
-    native_functions = map_new(sizeof(native_fnc_t));
-    native_fnc_t wrapper;
-    wrapper.fnc = native_print;
-    map_insert(native_functions, "print", &wrapper);
-    wrapper.fnc = native_object_new;
-    map_insert(native_functions, "Object", &wrapper);
-    wrapper.fnc = native_number;
-    map_insert(native_functions, "number", &wrapper);
-    wrapper.fnc = native_to_int;
-    map_insert(native_functions, "toInt", &wrapper);
-    wrapper.fnc = native_gc;
-    map_insert(native_functions, "gc", &wrapper);
-    wrapper.fnc = native_enqueue;
-    map_insert(native_functions, "enqueue", &wrapper);
-    wrapper.fnc = native_exit;
-    map_insert(native_functions, "exit", &wrapper);
-    wrapper.fnc = native_readln;
-    map_insert(native_functions, "readln", &wrapper);
+    native_functions = map_new(sizeof(z_native_fnc_t));
+
+    z_bind_native_function("print", native_print);
+    z_bind_native_function("Object", native_object_new);
+    z_bind_native_function("number", native_number);
+    z_bind_native_function("int", native_to_int);
+    z_bind_native_function("gc", native_gc);
+    z_bind_native_function("enqueue", native_enqueue);
+    z_bind_native_function("exit", native_exit);
+    z_bind_native_function("read", native_readln);
+
+    z_bind_native_string_function("length", native_strlen);
+    z_bind_native_string_function( "startsWith", native_str_startswith);
+    z_bind_native_string_function( "equals", native_str_equals);
+    z_bind_native_string_function( "substring", native_str_substring);
+
 }
