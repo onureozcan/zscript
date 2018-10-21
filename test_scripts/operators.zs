@@ -60,4 +60,14 @@ class Operators() {
     a = 1.5;
     print(---a); //-2 //longest match first: -- -a
 
+    print("1 and 0:"+ (1 and 0));
+    print("1 and 1:"+ (1 and 1));
+
+    print("1 or 0:"+ (1 or 0));
+    print("1 or 1:"+ (1 or 1));
+
+    for(var i = 1; i > 0 and i < 4;i++ ){
+        print(i);
+    }
+
 }

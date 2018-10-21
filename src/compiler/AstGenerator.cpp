@@ -159,25 +159,81 @@ public:
         return TerminalExpression::identifier(name.data());
     }
 
+    // a && b ->
+    // var __tmp__0 = 0;
+    // if (a) {
+    // if(b){
+    // __tmp__0 = 1;
+    // }
+    // }
+    Expression *andToIf(zeroscriptParser::ExpressionContext *pContext, Body *pBody) {
+        char *templateStr = const_cast<char *>("(()=>{ if(%s){ if(%s){ return 1; }}return 0;})()");
+        char *a = (strdup(pContext->expression(0)->getText().data()));
+        char *b = (strdup(pContext->expression(1)->getText().data()));
+        char *buff = static_cast<char *>(malloc(
+                strlen(templateStr) + strlen(a) * 2 + strlen(b) * 2 + 1));
+        sprintf(buff, templateStr,  a, b);
+        ANTLRInputStream in(buff, strlen(buff));
+        zeroscriptLexer lexer(&in);
+        CommonTokenStream tokens(&lexer);
+        zeroscriptParser parser(&tokens);
+        free(buff);
+        free(a);
+        free(b);
+        return visitExpression(parser.expression(),pBody);
+    }
+
+    // a || b ->
+    // if (a) {
+    //  return a;
+    // } else if(b){
+    //      return b;
+    // } return 0;
+    Expression *orToIf(zeroscriptParser::ExpressionContext *pContext, Body *pBody) {
+        char *templateStr = const_cast<char *>("(()=>{ if(%s){ return %s; } else if(%s){ return %s; } return 0;})()");
+        char *a = (strdup(pContext->expression(0)->getText().data()));
+        char *b = (strdup(pContext->expression(1)->getText().data()));
+        char *buff = static_cast<char *>(malloc(
+                strlen(templateStr) + strlen(a) * 2 + strlen(b) * 2 + 1));
+        sprintf(buff, templateStr,  a, a, b, b);
+        ANTLRInputStream in(buff, strlen(buff));
+        zeroscriptLexer lexer(&in);
+        CommonTokenStream tokens(&lexer);
+        zeroscriptParser parser(&tokens);
+        free(buff);
+        free(a);
+        free(b);
+        return visitExpression(parser.expression(),pBody);
+    }
+
     Expression *visitExpression(zeroscriptParser::ExpressionContext *pContext, Body *pKind) {
         if (pContext->primaryExpresssion()) {
             return visitPrimaryExpression(pContext->primaryExpresssion(), pKind);
         } else if (pContext->bop) {
-            Expression *left = visitExpression(pContext->expression(0), pKind);
-            Expression *right = visitExpression(pContext->expression(1), pKind);
-            BinaryExpression *expr = new BinaryExpression();
-            expr->left = left;
-            expr->right = right;
-            expr->setOp(pContext->bop->getText().data());
-            if (strcmp(expr->op, ".") == 0) {
-                if (expr->right->kind == AST::AST_KIND_TERMINAL) {
-                    TerminalExpression *ident = dynamic_cast<TerminalExpression *>(expr->right);
-                    if (ident->type == TerminalExpression::TYPE_IDENTIFIER) {
-                        ident->type = TerminalExpression::TYPE_STRING;
+            // turn logical operators into if statements for short circuit evaluation
+            if (strcmp("and", pContext->bop->getText().data()) == 0) {
+                //turn and into if statement
+                return andToIf(pContext, pKind);
+            } else if (strcmp("or", pContext->bop->getText().data()) == 0) {
+                //turn or into if statement
+                return orToIf(pContext, pKind);
+            } else {
+                Expression *left = visitExpression(pContext->expression(0), pKind);
+                Expression *right = visitExpression(pContext->expression(1), pKind);
+                BinaryExpression *expr = new BinaryExpression();
+                expr->left = left;
+                expr->right = right;
+                expr->setOp(pContext->bop->getText().data());
+                if (strcmp(expr->op, ".") == 0) {
+                    if (expr->right->kind == AST::AST_KIND_TERMINAL) {
+                        TerminalExpression *ident = dynamic_cast<TerminalExpression *>(expr->right);
+                        if (ident->type == TerminalExpression::TYPE_IDENTIFIER) {
+                            ident->type = TerminalExpression::TYPE_STRING;
+                        }
                     }
                 }
+                return expr;
             }
-            return expr;
         } else if (pContext->prefix) {
             Expression *right = visitExpression(pContext->expression(0), pKind);
             PrefixExpression *expr = new PrefixExpression();
@@ -536,7 +592,7 @@ public:
         cls = new ClassDeclaration();
         cls->body = visitBody(context->body(), NULL);
         cls->setIdentifier(context->identifier().at(0)->getText().data());
-        cls->arguments = visitArguments(context->argumentsList(),NULL);
+        cls->arguments = visitArguments(context->argumentsList(), NULL);
         //hanlde imports
         for (int_t i = 0; i < context->importStmt().size(); i++) {
             std::string path = (context->importStmt(i)->STRING()->getText());

@@ -30,7 +30,7 @@ public:
         if(isPrivate){
             cout << "private ";
         }
-        cout << "var `" << identifier << "` = ";
+        cout << "var " << identifier << " = ";
         value->print();
     }
 

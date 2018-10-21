@@ -53,7 +53,7 @@ public:
     char *data;
 
     void print() override {
-        printf(" [%s:%s] ", data, typeToStr(type));
+        printf(" %s ", data);
     }
 
 private:

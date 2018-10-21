@@ -30,7 +30,7 @@ public:
             AST *stmt = statements->at(i);
             if (stmt == NULL) continue;
             count++;
-            cout << "\n" << count << ":\n";
+            cout << "\n" << "";
             stmt->print();
         }
         cout << "}\n";
