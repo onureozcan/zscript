@@ -977,7 +977,7 @@ OP_FFRAME :
         ADD_OBJECT_TO_GC_LIST(current_context);
 
         //calculate registers
-        if (instruction_ptr->r1) {
+        if (instruction_ptr->r2) {
             int_t end_of_function = instruction_ptr->r2;
             int_t start_of_function = ((uint_t) (instruction_ptr)) - (uint_t) byte_stream;
             int_t bytes_to_go = end_of_function - start_of_function ;
@@ -986,7 +986,7 @@ OP_FFRAME :
                 z_instruction_t *instruction = (z_instruction_t *) (i + (uint_t) instruction_ptr);
                 instruction->opcode = (uint_t) dispatch_table[(instruction)->opcode];
             }
-            instruction_ptr->r1 = 0;
+            instruction_ptr->r2 = 0;
         }
         GOTO_NEXT;
     }
