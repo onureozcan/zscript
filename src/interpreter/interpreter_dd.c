@@ -273,11 +273,11 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
     fsize -= code_start;
     //initialize jump properties
 #ifdef PRE_CALCULATE_DISPATCH_POINTERS
-    for (long i = 0; i < fsize; i += sizeof(z_instruction_t)) {
+    /*for (long i = 0; i < fsize; i += sizeof(z_instruction_t)) {
         instruction_ptr = (z_instruction_t *) (code + i);
         //printf("%s %d, %d, %d \n", name_opcode(instruction_ptr->opcode), instruction_ptr->r0, instruction_ptr->r1, instruction_ptr->r2);
         instruction_ptr->opcode = (uint_t) dispatch_table[(instruction_ptr)->opcode];
-    }
+    }*/
 #endif
     //exit(0);
     //reset current instruction
@@ -288,7 +288,8 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
     }
     initial_state->return_code = 0;
 
-    GOTO_CURRENT;
+    goto OP_FFRAME;
+
 OP_SET_CATCH:
     {
 
@@ -868,6 +869,7 @@ OP_CALL :
                 INIT_R1;
                 *r1 = other_state->return_value;
                 instruction_ptr++;
+                GOTO_CURRENT;
             } else {
                 //our function
                 z_object_t *called_fnc = context_new();
@@ -906,7 +908,7 @@ OP_CALL :
                     initial_state->current_context = current_context;
                 }
             }
-            GOTO_CURRENT;
+            goto OP_FFRAME;
         } else if (r0->type == TYPE_CLASS_REF) {
             INIT_R1;
             z_type_info_t *type_info = object_manager_get_or_load_type_info(initial_state->class_name, NULL);
@@ -973,6 +975,19 @@ OP_FFRAME :
         current_context->context_object.locals_count = sizeof_locals + 1;
         current_context->context_object.symbols_address = instruction_ptr->r1;
         ADD_OBJECT_TO_GC_LIST(current_context);
+
+        //calculate registers
+        if (instruction_ptr->r1) {
+            int_t end_of_function = instruction_ptr->r2;
+            int_t start_of_function = ((uint_t) (instruction_ptr)) - (uint_t) byte_stream;
+            int_t bytes_to_go = end_of_function - start_of_function ;
+
+            for (long i = 0; i < bytes_to_go; i += sizeof(z_instruction_t)) {
+                z_instruction_t *instruction = (z_instruction_t *) (i + (uint_t) instruction_ptr);
+                instruction->opcode = (uint_t) dispatch_table[(instruction)->opcode];
+            }
+            instruction_ptr->r1 = 0;
+        }
         GOTO_NEXT;
     }
 OP_CREATE_THIS :

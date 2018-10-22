@@ -42,8 +42,9 @@ class Assembler {
                 instruction_ptr->r1 = (addData(str, (uint_t) (strlen(str) + 1)));
             } else if (instruction.opcode == FFRAME) {
                 z_instruction_t *instruction_ptr = ((z_instruction_t *) arraylist_get(program->instructions, i));
-                map<string, uint_t> symbolTable = *(map<string, uint_t>*)instruction.r1;
-                map<string, uint_t> *privatesTable = (map<string, uint_t>*)instruction.r2;
+                FunctionKind* func = (FunctionKind*) instruction.r1;
+                map<string, uint_t> symbolTable = *func->symbolTable;//*(map<string, uint_t>*)instruction.r1;
+                map<string, uint_t> *privatesTable = func->privatesTable;;// (map<string, uint_t>*)instruction.r2;
 
                 typedef std::function<bool(std::pair<std::string, int_t>, std::pair<std::string, int_t>)> Comparator;
 
@@ -67,7 +68,6 @@ class Assembler {
                     (addData(&isPrivate,sizeof(char)));
                     i++;
                 }
-                instruction_ptr->r2 = i;
             }
         }
 
@@ -102,6 +102,9 @@ class Assembler {
                     instruction.r1 = label_position_map[(char *) instruction.r1];
                 } else if (instruction.opcode == SET_CATCH) {
                     instruction.r0 = label_position_map[(char *) instruction.r0];
+                } else if (instruction.opcode == FFRAME) {
+                    // FFRAME <numLocals> <location of symbol table> <location of the end of this function>
+                    instruction.r2 = label_position_map[(char *) instruction.r2];
                 }
                 uint_t opcode = (instruction.opcode);
                 uint_t r0 = (instruction.r0);

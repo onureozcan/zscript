@@ -58,6 +58,8 @@ public :
     }
 
     void compileFunction(Function *func) {
+        char* endLabel = static_cast<char *>(malloc(100));
+        snprintf(endLabel,100,"end%s",func->identifier);
         program->addLabel("%s", func->identifier);
         uint_t index = program->addInstruction(FFRAME, (uint_t) NULL, (uint_t) NULL,
                                                (uint_t) NULL);
@@ -101,11 +103,13 @@ public :
         }
         compileBody(func->body);
         program->addInstruction(RETURN, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
+        program->addLabel("end%s",func->identifier);
         compileRemainingFunctions();
         uint_t locals_count = func->registerTable->size() + func->symbolTable->size();
         //set locals count
         ((z_instruction_t *) arraylist_get(program->instructions, index))->r0 = locals_count;
-        ((z_instruction_t *) arraylist_get(program->instructions, index))->r1 = (uint_t) (func->symbolTable);
+        ((z_instruction_t *) arraylist_get(program->instructions, index))->r1 = (uint_t) (func);
+        ((z_instruction_t *) arraylist_get(program->instructions, index))->r2 = (uint_t) (endLabel);
         functionsStack->pop();
     }
 
@@ -277,6 +281,8 @@ public :
     }
 
     void compileClass(ClassDeclaration *cls) {
+        char* endLabel = static_cast<char *>(malloc(100));
+        snprintf(endLabel,100,"end%s",cls->identifier);
         program->addLabel("%s", cls->identifier);
         uint_t index = program->addInstruction(FFRAME, NULL, NULL, NULL);
         program->addInstruction(CREATE_THIS, (uint_t) NULL, (uint_t) NULL,
@@ -291,15 +297,16 @@ public :
         }
         compileBody(cls->body);
         program->addInstruction(RETURN, (uint_t) NULL, (uint_t) NULL, (uint_t) NULL);
+        program->addLabel("end%s", cls->identifier);
         compileRemainingFunctions();
         uint_t locals_count = cls->registerTable->size() + cls->symbolTable->size();
         z_instruction_t *fframe = (z_instruction_t *) arraylist_get(program->instructions, index);
         //set args of FFRAME
         fframe->r0 = locals_count;
         //this will later be used to assemble required information
-        fframe->r1 = (uint_t) (cls->symbolTable);
+        fframe->r1 = (uint_t) (cls);
         //this will later be used to assemble required information
-        fframe->r2 = (uint_t) (cls->privatesTable);
+        fframe->r2 = (uint_t) (endLabel);
         functionsStack->pop();
     }
 

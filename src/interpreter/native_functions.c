@@ -92,7 +92,7 @@ z_reg_t *native_str_substring(z_reg_t *stack, z_reg_t *return_reg, z_object_t *s
     if (arg->type == TYPE_NUMBER) {
         char *new_str = (this_str + (int_t) arg->number_val);
         char *copied = (char *) z_alloc_or_die(strlen(new_str) + 1);
-        memcpy(copied, new_str, strlen(new_str));
+        strcpy(copied,new_str);
         return_reg->val = (int_t) string_new(copied);
         return_reg->type = TYPE_STR;
         ADD_OBJECT_TO_GC_LIST(return_reg);
