@@ -742,7 +742,7 @@ OP_GET_FIELD_IMMEDIATE :
                 } else {
                     //get field from an object instance
                     object_to_search_on = (z_object_t *) r0->val;
-                    z_interpreter_state_t *state = object_to_search_on->ordinary_object.saved_state;
+                    z_interpreter_state_t *state = object_to_search_on->instance_object.saved_state;
                     z_reg_t *prop = interpreter_get_field_virtual(state, initial_state, field_name_to_get);
                     if (prop) {
                         *r2 = *prop;
@@ -824,7 +824,7 @@ OP_SET_FIELD :
             } else {
                 //set field by using symbol table of this instance
                 object_to_search_on = (z_object_t *) r0->val;
-                z_interpreter_state_t *state = object_to_search_on->ordinary_object.saved_state;
+                z_interpreter_state_t *state = object_to_search_on->instance_object.saved_state;
                 if (interpreter_set_field_virtual(state, initial_state, field_name_to_get, r2)) {
                     if (state->return_code) {
                         interpreter_throw_exception_from_str(initial_state, state->exception_details);
@@ -994,8 +994,8 @@ OP_CREATE_THIS :
     {
         // create 'this'
         z_object_t *self = (z_object_t *) z_alloc_or_die(sizeof(z_object_t));
-        self->ordinary_object.saved_state = initial_state;
-        self->ordinary_object.type_info = (z_type_info_t *) map_get(known_types_map, initial_state->class_name);
+        self->instance_object.saved_state = initial_state;
+        self->instance_object.type_info = (z_type_info_t *) map_get(known_types_map, initial_state->class_name);
         self->operations = object_operations;
         self->type = TYPE_INSTANCE;
         locals_ptr[1].type = TYPE_INSTANCE;

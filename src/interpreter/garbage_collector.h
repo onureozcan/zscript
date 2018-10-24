@@ -65,7 +65,7 @@ void gc_free_object(z_object_t *object) {
         case TYPE_CLASS_REF:
             break;
         case TYPE_INSTANCE:
-            z_free(object->ordinary_object.saved_state);
+            z_free(object->instance_object.saved_state);
             break;
         case TYPE_OBJ:
             map_free(object->properties);
@@ -136,7 +136,7 @@ void gc_visit_function_ref(z_object_t *object) {
 }
 
 void gc_visit_instance(z_object_t *object) {
-    gc_visit_state(object->ordinary_object.saved_state);
+    gc_visit_state(object->instance_object.saved_state);
 }
 
 void gc_visit_object_with_map(z_object_t *object) {

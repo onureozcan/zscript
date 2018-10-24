@@ -136,18 +136,18 @@ object_new(char *class_name, map_t *imports_table, z_reg_t *stack_start, z_reg_t
             object_manager_register_object_type(class_name, bytes, fsize);
             object_type_info = (z_type_info_t *) map_get(known_types_map, class_name);
         }
-        obj->ordinary_object.type_info = object_type_info;
+        obj->instance_object.type_info = object_type_info;
         z_interpreter_state_t *initial_state = interpreter_state_new(
                 NULL,
-                obj->ordinary_object.type_info->bytecode_stream,
-                obj->ordinary_object.type_info->bytecode_size,
+                obj->instance_object.type_info->bytecode_stream,
+                obj->instance_object.type_info->bytecode_size,
                 class_name,
                 stack_ptr,
                 stack_start
         );
         gc_fix->val = (int_t) obj;
         gc_fix->type = TYPE_INSTANCE;
-        obj->ordinary_object.saved_state = initial_state;
+        obj->instance_object.saved_state = initial_state;
         obj->type = TYPE_INSTANCE;
         ADD_OBJECT_TO_GC_LIST(obj);
         z_interpreter_run(initial_state);

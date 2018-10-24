@@ -20,15 +20,16 @@ struct operations {
 typedef struct z_object {
     uhalf_int_t gc_version;
     uhalf_int_t type;
-    uint_t freed;
-    map_t *properties;
-    void* key_list_cache;
     struct operations operations;
     union {
         struct {
+            map_t *properties;
+            void* key_list_cache;
+        };
+        struct {
             z_type_info_t* type_info;
             z_interpreter_state_t* saved_state;
-        } ordinary_object;
+        } instance_object;
         struct {
             //parent scope
             void *parent_context;
@@ -43,6 +44,8 @@ typedef struct z_object {
             z_instruction_t *return_address;
         } context_object;
         struct {
+            map_t *properties;
+            void* key_list_cache;
             char *value;
         } string_object;
         struct {

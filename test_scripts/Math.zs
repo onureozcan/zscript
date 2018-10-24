@@ -6,9 +6,9 @@ class Math(){
 
     static function round(x){
         if (x < 0.0)
-            return toInt(x - 0.5);
+            return int(x - 0.5);
         else
-            return toInt(x + 0.5);
+            return int(x + 0.5);
     }
 
 }
