@@ -185,7 +185,7 @@ void load_class_code(const char *class_name, char **bytes, size_t *fsize) {
         snprintf(file_to_load, size, "%s/%s.zs", class_path, class_name);
         f = fopen(file_to_load, "rb");
         if (f == NULL) {
-            error_and_exit("cannot find class");
+            error_and_exit_fmt("cannot find class or variable %s",class_name);
         } else {
             fclose(f);
             *bytes = compile_file(file_to_load, fsize);

@@ -59,7 +59,9 @@ int main(int argc, const char *argv[]) {
     char *bytes = compile_file(file_path, &len);
     object_manager_init(class_path);
     if (runMode) {
+        printf("run script %s\n",filename);
         clock_t begin = clock();
+        pthread_barrier_init(&gc_safe_barrier, NULL, 1);
         pthread_barrier_init(&gc_safe_barrier, NULL, 1);
         thread_list = arraylist_new(sizeof(int_t));
         char *class_name = (char *) (z_alloc_or_gc(strlen(filename) + 1));
@@ -72,9 +74,6 @@ int main(int argc, const char *argv[]) {
         initial_state = z_interpreter_run(initial_state);
         if (initial_state->return_code) {
             error_and_exit(initial_state->exception_details);
-        }
-        if (event_queue) {
-            wait_for_event();
         }
         z_thread_gc_safe_end_thread();
         for (int_t i = 0; i < thread_list->size; i++) {

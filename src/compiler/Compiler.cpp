@@ -37,7 +37,7 @@ public :
         //ast->print();
         compileClass((ast));
         program->optimize();
-        //program->print();
+       // program->print();
         //exit(0);
         Assembler assembler;
         bytes = assembler.toBytes(program, &len);

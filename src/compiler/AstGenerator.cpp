@@ -448,7 +448,7 @@ public:
                                                         std::to_string(++jsonObjectCount)).data());
 
         Var *var = new Var();
-        var->setIdentifier(std::string(nameOfTheTempObject).data());
+        var->setIdentifier(nameOfTheTempObject);
         var->value = call;
 
         stmt->stmt = var;

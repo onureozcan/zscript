@@ -28,7 +28,7 @@ typedef int32_t half_int_t;
 typedef uint16_t uquarter_int_t;
 typedef int16_t quarter_int_t;
 #ifdef FLOAT_SUPPORT
-typedef float FLOAT;
+typedef double FLOAT;
 #else
 typedef int_t FLOAT;
 #endif

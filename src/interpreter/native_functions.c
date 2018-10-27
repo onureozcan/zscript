@@ -3,7 +3,9 @@
 //
 // Created by onur on 10.06.2018.
 //
-typedef z_reg_t *(*z_native_fnc_t)(z_reg_t *, z_reg_t *, z_object_t *);
+typedef struct z_native_return_value (*z_native_fnc_t)(z_reg_t *, z_reg_t *, z_object_t *);
+
+#define RETURN_NATIVE(s, e) return (z_native_return_value) {s,e};
 
 map_t *native_functions = NULL;
 
@@ -21,28 +23,27 @@ void z_bind_native_string_function(char *function_name, z_native_fnc_t fnc) {
     map_insert_non_enumerable(string_native_properties_map, function_name, &temp);
 }
 
-z_reg_t *native_exit(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
+z_native_return_value native_exit(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     exit((int) (stack--)->val);
-    return stack;
 }
 
-z_reg_t *native_gc(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
+z_native_return_value native_gc(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     if (used_heap > heap_limit) {
         schedule_gc();
     }
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_enqueue(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
+z_native_return_value native_enqueue(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     if (!event_queue) {
         event_queue = arraylist_new(sizeof(int_t));
     }
     z_reg_t *arg = stack--;
     enqueue_event(&arg->val);
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_number(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
+z_native_return_value native_number(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
     z_reg_t *arg = stack--;
     if (arg->type == TYPE_NUMBER) {
         return_reg->number_val = arg->number_val;
@@ -50,16 +51,24 @@ z_reg_t *native_number(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
         return_reg->number_val = (FLOAT) (atof(((z_object_t *) arg->val)->operations.to_string((void *) arg->val)));
     }
     return_reg->type = TYPE_NUMBER;
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_strlen(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
+z_native_return_value native_strlen(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
     return_reg->type = TYPE_NUMBER;
     return_reg->number_val = strlen(str->operations.to_string(str));
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_str_equals(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
+z_native_return_value native_assert(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
+    z_reg_t *arg = stack--;
+    if(arg->type == TYPE_NUMBER && arg->number_val == 1){
+        RETURN_NATIVE(stack, NULL);
+    } else
+        RETURN_NATIVE(stack, "assertion failed");
+}
+
+z_native_return_value native_str_equals(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
     z_reg_t *arg = stack--;
     char *other = 0;
     int_t ret = 0;
@@ -69,10 +78,10 @@ z_reg_t *native_str_equals(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str)
     }
     return_reg->type = TYPE_NUMBER;
     return_reg->number_val = ret;
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_str_startswith(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
+z_native_return_value native_str_startswith(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
     z_reg_t *arg = stack--;
     char *other = 0;
     int_t ret = 0;
@@ -83,40 +92,40 @@ z_reg_t *native_str_startswith(z_reg_t *stack, z_reg_t *return_reg, z_object_t *
     }
     return_reg->type = TYPE_NUMBER;
     return_reg->number_val = ret;
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_str_substring(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
+z_native_return_value native_str_substring(z_reg_t *stack, z_reg_t *return_reg, z_object_t *str) {
     z_reg_t *arg = stack--;
     char *this_str = str->operations.to_string(str);
     if (arg->type == TYPE_NUMBER) {
         char *new_str = (this_str + (int_t) arg->number_val);
         char *copied = (char *) z_alloc_or_die(strlen(new_str) + 1);
-        strcpy(copied,new_str);
+        strcpy(copied, new_str);
         return_reg->val = (int_t) string_new(copied);
         return_reg->type = TYPE_STR;
         ADD_OBJECT_TO_GC_LIST(return_reg);
-        return stack;
+        RETURN_NATIVE(stack, NULL);
     }
     return_reg->type = TYPE_NUMBER;
     return_reg->number_val = 0;
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_object_new(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
+z_native_return_value native_object_new(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     return_reg->val = (int_t) object_new(NULL, NULL, NULL, NULL, NULL);
     return_reg->type = TYPE_OBJ;
     ADD_OBJECT_TO_GC_LIST(return_reg->val);
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_object_key_size(z_reg_t *stack, z_reg_t *return_reg, z_object_t *object) {
+z_native_return_value native_object_key_size(z_reg_t *stack, z_reg_t *return_reg, z_object_t *object) {
     return_reg->number_val = object->properties->size;
     return_reg->type = TYPE_NUMBER;
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_object_key_list(z_reg_t *stack, z_reg_t *return_reg, z_object_t *object) {
+z_native_return_value native_object_key_list(z_reg_t *stack, z_reg_t *return_reg, z_object_t *object) {
     z_object_t *ret = (z_object_t *) object->key_list_cache;
     if (!ret) {
         ret = object_new(NULL, NULL, NULL, NULL, NULL);
@@ -134,10 +143,10 @@ z_reg_t *native_object_key_list(z_reg_t *stack, z_reg_t *return_reg, z_object_t 
     }
     return_reg->val = (int_t) ret;
     return_reg->type = TYPE_OBJ;
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_readln(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
+z_native_return_value native_readln(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     char c;
     size_t length = 0;
     // for decoration
@@ -155,10 +164,10 @@ z_reg_t *native_readln(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) 
     return_reg->val = (int_t) string_new((char *) z_decorate_ptr(buff, length));
     return_reg->type = TYPE_STR;
     ADD_OBJECT_TO_GC_LIST(return_reg->val);
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_print(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
+z_native_return_value native_print(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
     z_reg_t *arg = stack--;
     switch (arg->type) {
         case TYPE_NUMBER: {
@@ -182,14 +191,14 @@ z_reg_t *native_print(z_reg_t *stack, z_reg_t *return_reg, z_object_t *ignore) {
         default:
             puts(((z_object_t *) arg->val)->operations.to_string((void *) arg->val));
     }
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
-z_reg_t *native_to_int(z_reg_t *stack, z_reg_t *return_reg, z_object_t *object) {
+z_native_return_value native_to_int(z_reg_t *stack, z_reg_t *return_reg, z_object_t *object) {
     z_reg_t *arg = stack--;
     return_reg->number_val = ((int_t) arg->number_val);
     return_reg->type = TYPE_NUMBER;
-    return stack;
+    RETURN_NATIVE(stack, NULL);
 }
 
 
@@ -201,7 +210,7 @@ void z_native_funcions_init() {
     z_bind_native_function("number", native_number);
     z_bind_native_function("int", native_to_int);
     z_bind_native_function("gc", native_gc);
-    z_bind_native_function("enqueue", native_enqueue);
+    z_bind_native_function("assert", native_assert);
     z_bind_native_function("exit", native_exit);
     z_bind_native_function("read", native_readln);
 

@@ -128,7 +128,15 @@
 
 
 typedef struct z_instruction_t {
-    uint_t opcode;
+    union {
+        struct {
+            uint_t opcode;
+        };
+        struct {
+            uhalf_int_t short_opcode;
+            uhalf_int_t line_number;
+        };
+    };
     uint_t r0;  //index of a local
     union {
         uint_t r1;  //index of a local

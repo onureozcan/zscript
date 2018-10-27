@@ -37,7 +37,7 @@ class ExpressionCompiler {
 public:
     uint_t compilePostfix(PostfixExpression *pExpression, uint_t requestedDestinationRegister = 0) {
         uint_t leftReg = (uint_t) compileExpression(pExpression->expr);
-        uint_t target = requestedDestinationRegister == 0 ? leftReg : requestedDestinationRegister;
+        uint_t target = requestedDestinationRegister == 0 ? getRegister(NULL) : requestedDestinationRegister;
         program->addInstruction(MOV, target, leftReg, NULL);
         if (strcmp(pExpression->op, "++") == 0) {
             program->addInstruction(INC, leftReg, leftReg, NULL);
@@ -53,7 +53,7 @@ public:
 
     uint_t compilePrefix(PrefixExpression *pExpression, int_t requestedDestinationRegister = 0) {
         uint_t leftReg = (uint_t) compileExpression(pExpression->expr);
-        uint_t target = leftReg;
+        uint_t target = requestedDestinationRegister == 0 ? getRegister(NULL) : requestedDestinationRegister;
         if (strcmp(pExpression->op, "++") == 0) {
             target = (uint_t) requestedDestinationRegister == 0 ? leftReg : requestedDestinationRegister;
             program->addInstruction(INC, leftReg, target, NULL);
@@ -61,11 +61,13 @@ public:
             target = (uint_t) requestedDestinationRegister == 0 ? leftReg : requestedDestinationRegister;
             program->addInstruction(DEC, leftReg, target, NULL);
         } else if (strcmp(pExpression->op, "-") == 0) {
+            if(!requestedDestinationRegister){ freeRegister(target); }
             uint_t rightReg = (uint_t) compileTerminal(TerminalExpression::number("-1"));
             target = (uint_t) requestedDestinationRegister == 0 ? leftReg : requestedDestinationRegister;
             program->addInstruction(MUL, leftReg, rightReg, target);
             freeRegister(rightReg);
         } else if (strcmp(pExpression->op,"throw") == 0){
+            if(!requestedDestinationRegister){ freeRegister(target); }
             program->addInstruction(THROW_EXCEPTION, leftReg, NULL, NULL);
         }
         return target;

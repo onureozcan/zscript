@@ -11,22 +11,12 @@
 #define TYPE_CLASS_REF 128
 #define TYPE_CONTEXT 256
 
-#define PRE_CALCULATE_DISPATCH_POINTERS
-
 #define INIT_R0 z_reg_t* r0 = locals_ptr + instruction_ptr->r0
 #define INIT_R1 z_reg_t* r1 = locals_ptr + instruction_ptr->r1
 #define INIT_R2 z_reg_t* r2 = locals_ptr + instruction_ptr->r2
 
-#ifndef PRE_CALCULATE_DISPATCH_POINTERS
-
-#define GOTO_NEXT goto *dispatch_table[(++instruction_ptr)->opcode];
-#define GOTO_CURRENT goto *dispatch_table[(instruction_ptr)->opcode];
-#else
-
 #define GOTO_NEXT goto *(++instruction_ptr)->opcode;
 #define GOTO_CURRENT goto *(instruction_ptr)->opcode;
-
-#endif
 
 #define ADD_OBJECT_TO_GC_LIST(c) GC_LIST_LOCK arraylist_push(gc_objects_list,&(c)); GC_LIST_UNLOCK
 #define ADD_ROOT_TO_GC_LIST(c) GC_LIST_LOCK arraylist_push(interpreter_states_list,&(c)); GC_LIST_UNLOCK
@@ -44,6 +34,11 @@ typedef struct z_reg_t {
 #endif
     };
 } z_reg_t;
+
+typedef struct z_native_return_value {
+    z_reg_t* stack_ptr;
+    char* error_message;
+} z_native_return_value;
 
 char *num_to_str(FLOAT val);
 
@@ -196,13 +191,8 @@ void z_thread_gc_safe_end_thread() {
  * @return modified state.
  */
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
-
-#ifdef PRE_CALCULATE_DISPATCH_POINTERS
     char *byte_stream = (char *) z_alloc_or_die((size_t) initial_state->fsize);
     memcpy(byte_stream, initial_state->byte_stream, (size_t) initial_state->fsize);
-#else
-    char *byte_stream = initial_state->byte_stream;
-#endif
     int_t fsize = initial_state->fsize;
     z_object_t *current_context = (z_object_t *) initial_state->current_context;
 
@@ -271,16 +261,7 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
             &&OP_CREATE_THIS
     };
     fsize -= code_start;
-    //initialize jump properties
-#ifdef PRE_CALCULATE_DISPATCH_POINTERS
-    /*for (long i = 0; i < fsize; i += sizeof(z_instruction_t)) {
-        instruction_ptr = (z_instruction_t *) (code + i);
-        //printf("%s %d, %d, %d \n", name_opcode(instruction_ptr->opcode), instruction_ptr->r0, instruction_ptr->r1, instruction_ptr->r2);
-        instruction_ptr->opcode = (uint_t) dispatch_table[(instruction_ptr)->opcode];
-    }*/
-#endif
-    //exit(0);
-    //reset current instruction
+
     if (initial_state->instruction_pointer == NULL) {
         instruction_ptr = (z_instruction_t *) code;
     } else {
@@ -362,16 +343,16 @@ OP_INC:
     {
         INIT_R0;
         INIT_R1;
-        r1->number_val = (r0->number_val + 1);
-        r1->type = TYPE_NUMBER;
+        r0->number_val ++;
+        *r1 = *r0;
         GOTO_NEXT;
     };
 OP_DEC:
     {
         INIT_R0;
         INIT_R1;
-        r1->number_val = (r0->number_val -1);
-        r1->type = TYPE_NUMBER;
+        r0->number_val --;
+        *r1 = *r0;
         GOTO_NEXT;
     };
 OP_ADD :
@@ -461,7 +442,7 @@ OP_CMP_EQUAL :
         INIT_R0;
         INIT_R1;
         INIT_R2;
-        r2->number_val = (r0->val == r1->val);
+        r2->number_val = (r0->number_val == r1->number_val);
         r2->type = TYPE_NUMBER;
         GOTO_NEXT
     };
@@ -577,7 +558,7 @@ OP_JE :
     {
         INIT_R0;
         INIT_R1;
-        if (r0->val == r1->val) {
+        if (r0->number_val == r1->number_val) {
             instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
             GOTO_CURRENT;
         }
@@ -587,7 +568,7 @@ OP_JNE :
     {
         INIT_R0;
         INIT_R1;
-        if (r0->val != r1->val) {
+        if (r0->number_val != r1->number_val) {
             instruction_ptr = (z_instruction_t *) (byte_stream + instruction_ptr->r2);
             GOTO_CURRENT;
         }
@@ -844,7 +825,13 @@ OP_CALL :
             //call native function
             z_native_fnc_t native_fnc = (z_native_fnc_t ) r0->val;
             INIT_R1;
-            initial_state->stack_ptr = native_fnc(initial_state->stack_ptr, r1, object_to_search_on);
+            struct z_native_return_value ret = native_fnc(initial_state->stack_ptr, r1, object_to_search_on);
+            initial_state->stack_ptr = ret.stack_ptr;
+            if (ret.error_message) {
+                interpreter_throw_exception_from_str(initial_state, ret.error_message);
+                RETURN_IF_ERROR;
+                GOTO_CATCH;
+            }
         } else if (r0->type == TYPE_FUNCTION_REF) {
             z_object_t *function_ref = (z_object_t *) r0->val;
             //someone else's function...
