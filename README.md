@@ -1,6 +1,6 @@
 ## zeroscript
 
-**what is ist and why?**
+**what is is and why?**
 
 It is a toy programming language for hobby purposes. The reason I am writing a scripting language is to use it in my hobby operating system development project (ZeroscriptOS).
 
