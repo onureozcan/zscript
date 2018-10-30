@@ -25,5 +25,7 @@ int main() {
     test("../test_scripts/JsonTest.zs");
     test("../test_scripts/ThrowTest.zs");
     test("../test_scripts/ScopesTest.zs");
+    test("../test_scripts/AsyncFunctionTest.zs");
+    test("../test_scripts/RecursiveFibonacci.zs");
     return 0;
 }

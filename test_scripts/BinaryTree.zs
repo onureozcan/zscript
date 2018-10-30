@@ -1,5 +1,5 @@
-class BinaryTree(val){
-    var data = val;
+class BinaryTree(data){
+
     var left;
     var right;
 

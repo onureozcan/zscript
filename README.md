@@ -1,7 +1,18 @@
 ## zeroscript
 
-a toy programming language for hobby purposes. do not take it seriously.
-it will later be used to provide userspace to zeroscriptOs project.
+**what is ist and why?**
+
+It is a toy programming language for hobby purposes. The reason I am writing a scripting language is to use it in my hobby operating system development project (ZeroscriptOS).
+
+Zeroscript will work as a way to write user space applications for the os project without actually implementing a user space. The whole kernel will act as a Zeroscript interpreter.
+Native bindings will displace system calls. Every process being implemented in a scripting language will provide isolation.
+
+I know this model is questionable and performance of such an os would not be comparable to a "normal" one but as I said before, it is a hobby project and every single line written is for pleasure.
+After all no one cares if implementing things this way is the best or not for an os that no one will use :)
+
+Zeroscript is initial step of writing ZeroscriptOS. However when it is done, Zeroscript will be ready to use in not only for the operating system project that I have mentioned above, but also for the Desktop Linux environments and may be in Windows if pthread-related parts are converted to their Windows equivalents.
+
+It is now too early to use it in real world, and there ara tons of things to do. I have a rough road map and implementing these steps one by one. Apart from having basics, the road map is as follows:
 
 **roadmap:**
 
@@ -171,8 +182,25 @@ class PrivateVriablesTest(){
     }
 ```
 
-**run as script**:
+**build from source**:
+
+It is a C-C++ mixed project and the whole project is dependent to the ANTLR c++ runtime. I am pretty sure that there is a wiser way to use antlr with cmake but for now it requires header files and binaries to be in the default include path due to my poor build tool knowledge.
+
+It is only tested on gcc 6 and 7. Also requires gcc's labels as values extension and uses posix threads so I am not sure about how it will behave under Windows.
+Note that portability is not a concern for this project. At least for now.
+
+When build is done, two binaries called zero and zrun will appear. zero is the one that contains both compiler and interpreter parts. zrun is only the interpreter part. (Will cover why there is such a distinction later)
+
+**run scripts**:
 
 ```
-./zrun <path to source file> [class path]
+./zero <path to source file>
 ```
+
+**compile scripts and generate .zar files**:
+
+not yet.
+
+**run zar files**:
+
+not yet.
