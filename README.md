@@ -1,8 +1,8 @@
 ## zeroscript
 
-**what is is and why?**
+It is a dynamically typed, object oriented scripting language written in c and c++ for just fun.
 
-It is a toy programming language for hobby purposes. The reason I am writing a scripting language is to use it in my hobby operating system development project (ZeroscriptOS).
+The reason I am writing a scripting language is to use it in my hobby operating system development project (ZeroscriptOS).
 
 Zeroscript will work as a way to write user space applications for the os project without actually implementing a user space. The whole kernel will act as a Zeroscript interpreter.
 Native bindings will displace system calls. Every process being implemented in a scripting language will provide isolation.
@@ -10,7 +10,7 @@ Native bindings will displace system calls. Every process being implemented in a
 I know this model is questionable and performance of such an os would not be comparable to a "normal" one but as I said before, it is a hobby project and every single line written is for pleasure.
 After all no one cares if implementing things this way is the best or not for an os that no one will use :)
 
-Zeroscript is initial step of writing ZeroscriptOS. However when it is done, Zeroscript will be ready to use in not only for the operating system project that I have mentioned above, but also for the Desktop Linux environments and may be in Windows if pthread-related parts are converted to their Windows equivalents.
+Zeroscript is initial step of writing ZeroscriptOS. However when it is done, Zeroscript will be ready to use not only for the operating system project that I have mentioned above, but also for the Desktop Linux environments and may be in Windows if pthread-related parts are converted to their Windows equivalents.
 
 It is now too early to use it in real world, and there are tons of things to do. I have a untidy road map and implementing these steps one by one. Apart from having basics, the road map is as follows:
 
@@ -190,6 +190,14 @@ It is only tested on gcc 6 and 7. Also requires gcc's labels as values extension
 Note that portability is not a concern for this project. At least for now.
 
 When build is done, two binaries called zero and zrun will appear. zero is the one that contains both compiler and interpreter parts. zrun is only the interpreter part. (Will cover why there is such a distinction later)
+
+**testing**
+
+Tests are intended to be more like "real world" problems rather than unit testing of each feature. There is no easy way to test features in an isolated way for me.
+For example, I can not test correctness of math operations without relying on correctness of assert function.
+For this reason, I write Zeroscript equivalents of well known algorithms, data structures and design patterns such as binary trees, recursive fibonacci etc and expect them to give correct results.
+
+To run tests, build tester and run it in the project's root folder.
 
 **run scripts**:
 
