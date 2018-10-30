@@ -12,7 +12,7 @@ After all no one cares if implementing things this way is the best or not for an
 
 Zeroscript is initial step of writing ZeroscriptOS. However when it is done, Zeroscript will be ready to use in not only for the operating system project that I have mentioned above, but also for the Desktop Linux environments and may be in Windows if pthread-related parts are converted to their Windows equivalents.
 
-It is now too early to use it in real world, and there ara tons of things to do. I have a rough road map and implementing these steps one by one. Apart from having basics, the road map is as follows:
+It is now too early to use it in real world, and there are tons of things to do. I have a untidy road map and implementing these steps one by one. Apart from having basics, the road map is as follows:
 
 **roadmap:**
 
