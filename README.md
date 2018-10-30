@@ -1,9 +1,10 @@
 ## zeroscript
 
-It is a dynamically typed, object oriented scripting language written in c and c++ for just fun.
+It is a dynamically typed, object oriented scripting language written in c and c++ just for fun.
 
-The reason I am writing a scripting language is to use it in my hobby operating system development project (ZeroscriptOS).
+**zeroscript os**
 
+The reason behind writing this language is to use it in an another hobby operating system development project (ZeroscriptOS).
 Zeroscript will work as a way to write user space applications for the os project without actually implementing a user space. The whole kernel will act as a Zeroscript interpreter.
 Native bindings will displace system calls. Every process being implemented in a scripting language will provide isolation.
 
@@ -11,6 +12,7 @@ I know this model is questionable and performance of such an os would not be com
 After all no one cares if implementing things this way is the best or not for an os that no one will use :)
 
 Zeroscript is initial step of writing ZeroscriptOS. However when it is done, Zeroscript will be ready to use not only for the operating system project that I have mentioned above, but also for the Desktop Linux environments and may be in Windows if pthread-related parts are converted to their Windows equivalents.
+
 
 It is now too early to use it in real world, and there are tons of things to do. I have a untidy road map and implementing these steps one by one. Apart from having basics, the road map is as follows:
 
