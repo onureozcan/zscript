@@ -1,56 +1,8 @@
 ## zeroscript
 
-It is a dynamically typed, object oriented scripting language written in c and c++ just for fun.
+It is a dynamically typed, object oriented scripting language written in c and c++.
+The name does not mean that it includes no scripting part. Zero here states that it is in the 0th stage, has a long way to go.
 
-**zeroscript os**
-
-The reason behind writing this language is to use it in an another hobby operating system development project (ZeroscriptOS).
-Zeroscript will work as a way to write user space applications for the os project without actually implementing a user space. The whole kernel will act as a Zeroscript interpreter.
-Native bindings will displace system calls. Every process being implemented in a scripting language will provide isolation.
-
-I know this model is questionable and performance of such an os would not be comparable to a "normal" one but as I said before, it is a hobby project and every single line written is for pleasure.
-After all no one cares if implementing things this way is the best or not for an os that no one will use :)
-
-Zeroscript is initial step of writing ZeroscriptOS. However when it is done, Zeroscript will be ready to use not only for the operating system project that I have mentioned above, but also for the Desktop Linux environments and may be in Windows if pthread-related parts are converted to their Windows equivalents.
-
-
-It is now too early to use it in real world, and there are tons of things to do. I have a untidy road map and implementing these steps one by one. Apart from having basics, the road map is as follows:
-
-**roadmap:**
-
-- [X] json
-
-- [X] foreach loop 
-
-- [X] lambda expressions 
-
-- [X] object creation from class 
-
-- [X] static objects and functions 
-
-- [X] import classes from different folders
-
-- [X] throw errors
-
-- [X] try/catch
-
-- [X] access modifiers
-
-- [ ] class inheritance
-
-- [X] garbage collector
-
-- [X] asynchronous functions
-
-- [ ] packaging of compiled bytecode into .zar files
-
-- [ ] standard library implementation
-
-- [ ] semantic analyzer
-
-- [ ] optimizer 
-
-- [ ] intelliJ plugin
 
 **basic syntax**:
 
@@ -59,6 +11,8 @@ It resembles javascript a lot and yet has some different sides
 - class and member declaration:
 
 ```
+// classses are top level entities,
+// meaning that everything must belong to a class.
 class Hello(/*constructor arguments*/){
 
     //member variable
@@ -74,7 +28,7 @@ class Hello(/*constructor arguments*/){
         this.helloMessage = message;
 
     }
-
+    // writing `this` is not mandatory
     function getHelloMessage(){
         return helloMessage;
     }
@@ -120,7 +74,7 @@ class Math(){
 
  // json
  var obj = Object();
- var obj2 = {};
+ var obj2 = { "a":0, "c": "d" };
 
  //array
  var arr = [];
@@ -184,16 +138,67 @@ class PrivateVriablesTest(){
     }
 ```
 
+
+**ZeroscriptOs**
+
+The reason behind writing this language is to use it in an another hobby operating system development project (ZeroscriptOS).
+Zeroscript will work as a way to write user space applications for the os project without actually implementing a user space. The whole kernel will act as a Zeroscript interpreter.
+Native bindings will displace system calls. Every process being implemented in a scripting language will provide isolation.
+
+Although this model is questionable and performance of such an os would not be comparable to a "normal" one but as it is said before, it is a hobby project and every single line written is for pleasure.
+After all no one cares if implementing things this way is the best or not for an os that no one will use :)
+
+Zeroscript is initial step of writing ZeroscriptOS. However when it is done, Zeroscript will be ready to use not only under the operating system project that I have mentioned above, but also under the Desktop Linux environments and may be in Windows if pthread-related parts are converted to their Windows equivalents.
+
+It is now too early to use it in real world, and there are tons of things to do. I have an untidy road map and implementing these steps one by one. Apart from having basics, the road map is as follows:
+
+**roadmap:**
+
+- [X] json
+
+- [X] foreach loop
+
+- [X] lambda expressions
+
+- [X] object creation from class
+
+- [X] static objects and functions
+
+- [X] import classes from different folders
+
+- [X] throw errors
+
+- [X] try/catch
+
+- [X] access modifiers
+
+- [ ] class inheritance
+
+- [X] garbage collector
+
+- [X] asynchronous functions
+
+- [ ] packaging of compiled bytecode into .zar files
+
+- [ ] standard library implementation
+
+- [ ] semantic analyzer
+
+- [ ] optimizer
+
+- [ ] intelliJ plugin
+
+- [ ] jit compiler
+
+
 **build from source**:
 
-It is a C-C++ mixed project and the whole project is dependent to the ANTLR c++ runtime. I am pretty sure that there is a wiser way to use antlr with cmake but for now it requires header files and binaries to be in the default include path due to my poor build tool knowledge.
+It is a C/C++ mixed project and the whole project is dependent to the ANTLR c++ runtime. I am pretty sure that there is a wiser way to use antlr with cmake but for now it requires header files and binaries to be in the default include path due to my poor build tool knowledge.
 
 It is only tested on gcc 6 and 7. Also requires gcc's labels as values extension and uses posix threads so I am not sure about how it will behave under Windows.
 Note that portability is not a concern for this project. At least for now.
 
-When build is done, two binaries called zero and zrun will appear. zero is the one that contains both compiler and interpreter parts. zrun is only the interpreter part. (Will cover why there is such a distinction later)
-
-**testing**
+**testing**:
 
 Tests are intended to be more like "real world" problems rather than unit testing of each feature. There is no easy way to test features in an isolated way for me.
 For example, I can not test correctness of math operations without relying on correctness of assert function.
@@ -214,3 +219,7 @@ not yet.
 **run zar files**:
 
 not yet.
+
+**contributions**:
+
+any help will be appreciated. just make a pull request.
