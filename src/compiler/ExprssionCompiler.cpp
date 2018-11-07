@@ -43,10 +43,17 @@ public:
             program->addInstruction(INC, leftReg, leftReg, NULL);
         } else if (strcmp(pExpression->op, "--") == 0) {
             program->addInstruction(DEC, leftReg, leftReg, NULL);
-        } else {
-            uint_t rightReg = (uint_t) compileTerminal(TerminalExpression::number("1"));
-            program->addInstruction(toOpcode(pExpression->op), leftReg, rightReg, leftReg);
-            freeRegister(rightReg);
+        }
+        // if expression is of the identifier and this identifier is not in the current scopre
+        // write its value back via a virtual set
+        TerminalExpression *ident = dynamic_cast<TerminalExpression *>(pExpression->expr);
+        if (ident && ident->type == TerminalExpression::TYPE_IDENTIFIER) {
+            if (!getRegister(ident->data)) {
+                uint_t temp = getRegister(NULL);
+                program->addInstruction(MOV_STR, temp, (uint_t) ident->data, NULL);
+                program->addInstruction(SET_FIELD, 1, temp, leftReg);
+                freeRegister(temp);
+            }
         }
         return target;
     }
@@ -61,14 +68,27 @@ public:
             target = (uint_t) requestedDestinationRegister == 0 ? leftReg : requestedDestinationRegister;
             program->addInstruction(DEC, leftReg, target, NULL);
         } else if (strcmp(pExpression->op, "-") == 0) {
-            if(!requestedDestinationRegister){ freeRegister(target); }
+            if (!requestedDestinationRegister) { freeRegister(target); }
             uint_t rightReg = (uint_t) compileTerminal(TerminalExpression::number("-1"));
             target = (uint_t) requestedDestinationRegister == 0 ? leftReg : requestedDestinationRegister;
             program->addInstruction(MUL, leftReg, rightReg, target);
             freeRegister(rightReg);
-        } else if (strcmp(pExpression->op,"throw") == 0){
-            if(!requestedDestinationRegister){ freeRegister(target); }
+            return target;
+        } else if (strcmp(pExpression->op, "throw") == 0) {
+            if (!requestedDestinationRegister) { freeRegister(target); }
             program->addInstruction(THROW_EXCEPTION, leftReg, NULL, NULL);
+            return target;
+        }
+        // if expression is of the identifier and this identifier is not in the current scopre
+        // write its value back via a virtual set
+        TerminalExpression *ident = dynamic_cast<TerminalExpression *>(pExpression->expr);
+        if (ident && ident->type == TerminalExpression::TYPE_IDENTIFIER) {
+            if (!getRegister(ident->data)) {
+                uint_t temp = getRegister(NULL);
+                program->addInstruction(MOV_STR, temp, (uint_t) ident->data, NULL);
+                program->addInstruction(SET_FIELD, 1, temp, leftReg);
+                freeRegister(temp);
+            }
         }
         return target;
     }
@@ -124,7 +144,7 @@ public:
             if (destinationRegister == 0)
                 tempRegister = getRegister(NULL);
             else tempRegister = destinationRegister;
-            program->addInstruction(GET_FIELD_IMMEDIATE, 1, (uint_t)(identifier),
+            program->addInstruction(GET_FIELD_IMMEDIATE, 1, (uint_t) (identifier),
                                     (uint_t) (tempRegister));
         }
         return tempRegister;
@@ -164,7 +184,7 @@ public:
                     program->addInstruction(SET_FIELD, (uint_t) (1),
                                             (uint_t) (leftReg), (uint_t) (rightReg));
                     //result of this operation is null
-                    return (uint_t)0;
+                    return (uint_t) 0;
                 }
             } else {
                 error_and_exit(const_cast<char *>("left value expected"));
@@ -198,7 +218,7 @@ public:
     uint_t compileTerminal(TerminalExpression *right, uint_t destinationRegister = 0, int_t has_lookup_object = 0) {
         if (right->type == TerminalExpression::TYPE_IDENTIFIER) {
             if (has_lookup_object) compileIdentifier(right->data, destinationRegister);
-            return compileIdentifierImmediate(right->data,destinationRegister);
+            return compileIdentifierImmediate(right->data, destinationRegister);
         }
         uint_t reg = destinationRegister;
         if (reg == 0) reg = getRegister(NULL);

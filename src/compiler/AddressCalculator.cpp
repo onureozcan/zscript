@@ -94,9 +94,12 @@ public:
 
     void calculateVar(Var *var) {
         if (!var->isStatic){
-            addToCurrentTable(var->identifier);
-            if(var->isPrivate)
+            if(!var->isSynchronized){
+                addToCurrentTable(var->identifier);
+            }
+            if(var->isPrivate){
                 addToCurrentPrivatesMap(var->identifier);
+            }
         }
     }
 

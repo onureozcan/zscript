@@ -15,6 +15,7 @@ public:
     Expression *value;
     bool isStatic = false;
     bool isPrivate = false;
+    bool isSynchronized = false;
 
     void setIdentifier(const char *data) {
         char *temp = (char *) (malloc(sizeof(char) * strlen(data) + 1));

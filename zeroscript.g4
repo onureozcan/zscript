@@ -78,11 +78,11 @@ anonymousFunction:
     ;
 
 function:
-    PRIVATE? STATIC? ASYNC? FUNC? functionName = identifier '(' argumentsList ')' body
+    PRIVATE? (STATIC|ASYNC)? FUNC? functionName = identifier '(' argumentsList ')' body
     ;
 
 var:
-    PRIVATE? STATIC? VAR variableDeclarationPart  (',' variableDeclarationPart)*
+    PRIVATE? (STATIC|SYNCHRONIZED)? VAR variableDeclarationPart  (',' variableDeclarationPart)*
     ;
 
 variableDeclarationPart:
@@ -187,6 +187,7 @@ IMPORT             : 'import';
 AS                 : 'as';
 ASYNC              : 'async';
 PRIVATE            : 'private';
+SYNCHRONIZED       : 'synchronized';
 
 // Literals
 INT             : '0'|[1-9][0-9]* ;

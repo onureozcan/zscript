@@ -1,6 +1,6 @@
 class Primetest() {
 
-    var testLimit = 1000;
+    var testLimit = 100;
     var inlineTest = false;
 
     if (inlineTest) {

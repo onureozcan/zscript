@@ -38,8 +38,8 @@ class Recursive()
 
     for (var i = 0; i < 26; i++) {
         var fib = fibonacci(i);
-        assert(fib == results[i]);
         print("fib(" + i + "):" + fib);
+        assert(fib == results[i]);
     }
 
 }

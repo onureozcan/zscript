@@ -28,5 +28,6 @@ int main() {
     test("../test_scripts/AsyncFunctionTest.zs");
     test("../test_scripts/RecursiveFibonacci.zs");
     test("../test_scripts/CombinatorFunctionTest.zs");
+    test("../test_scripts/AsyncModifySharedDataTest.zs");
     return 0;
 }

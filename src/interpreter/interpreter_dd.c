@@ -22,6 +22,14 @@
 #define ADD_ROOT_TO_GC_LIST(c) GC_LIST_LOCK arraylist_push(interpreter_states_list,&(c)); GC_LIST_UNLOCK
 #define CREATE_STACK(s) (z_reg_t *) (z_alloc_or_die((s) * sizeof(z_reg_t)));
 
+pthread_mutex_t symbol_table_lock = PTHREAD_MUTEX_INITIALIZER;
+#define LOCK_SYMBOL_TABLE pthread_mutex_lock(&symbol_table_lock);
+#define UNLOCK_SYMBOL_TABLE pthread_mutex_unlock(&symbol_table_lock);
+
+
+pthread_mutex_t synchronized_access_lock = PTHREAD_MUTEX_INITIALIZER;
+#define LOCK_SYNCHRONIZED_ACCESS pthread_mutex_lock(&synchronized_access_lock);
+#define UNLOCK_SYNCHRONIZED_ACCESS pthread_mutex_unlock(&synchronized_access_lock);
 
 typedef struct z_reg_t {
     int_t type;
@@ -56,6 +64,8 @@ typedef struct z_interpreter_state_t {
     char *class_name;
     // exception message (if so)
     char *exception_details;
+    // synchronized variables. access to them is protected by mutexes.
+    map_t* synchronized_variables;
     int_t return_code;
     // byte code file size
     int_t fsize;
@@ -154,6 +164,8 @@ void *run_async(void *argsv) {
                                                                initial_state->fsize, initial_state->class_name,
                                                                args->stack_ptr,
                                                                args->stack_start);
+    map_free(other_state->synchronized_variables);
+    other_state->synchronized_variables = initial_state->synchronized_variables;
     ADD_ROOT_TO_GC_LIST(other_state);
     called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
     other_state->instruction_pointer = (function_ref->function_ref_object.start_address);
@@ -168,21 +180,21 @@ void *run_async(void *argsv) {
 }
 
 void z_thread_gc_safe_end_thread() {
+    z_log("trying to end thread\n");
     GC_BUSY_LOCK
-    // if someone reached to gc lock, they will need us to sync. so we should do a garbage collection
+    // if someone reaches gc lock, they will need us to sync. so we should do a garbage collection
     if (gc_busy) {
+        z_log("it seems that there is an ongoing gc, will join and then quit\n");
+        GC_BUSY_UNLOCK
         schedule_gc();
     }
-    while (gc_busy) {
-        //printf("it seems that gc barrier is reached, i should await before quiting");
-        pthread_cond_wait(&gc_busy_cond, &gc_busy_lock);
-    }
+    GC_BUSY_UNLOCK
     THREAD_LIST_LOCK
     total_thread_count--;
-    //printf("quiting, thread count: %d\n", total_thread_count);
+    z_log("quiting, thread count: %d\n", total_thread_count);
     init_gc_barrier(total_thread_count);
     THREAD_LIST_UNLOCK
-    GC_BUSY_UNLOCK
+
 }
 
 /**
@@ -660,6 +672,7 @@ OP_GET_FIELD_IMMEDIATE :
             //search `this`
             z_object_t *context = current_context;
             while (context != NULL) {
+                LOCK_SYMBOL_TABLE
                 map_t *symbol_table = context->context_object.symbol_table;
                 if (!symbol_table) {
                     //build symbol table
@@ -669,6 +682,7 @@ OP_GET_FIELD_IMMEDIATE :
                     context->context_object.symbol_table = symbol_table;
                 }
                 int_t *index_ptr = ((int_t *) map_get(symbol_table, field_name_to_get));
+                UNLOCK_SYMBOL_TABLE
                 if (index_ptr) {
                     int_t index = *index_ptr;
                     *r2 = *(((z_reg_t *) context->context_object.locals) + index);
@@ -677,8 +691,18 @@ OP_GET_FIELD_IMMEDIATE :
                 }
                 context = (z_object_t *) context->context_object.parent_context;
             }
+            LOCK_SYNCHRONIZED_ACCESS
+            //not found? maybe a synchronized variable?
+            z_reg_t *prop = (z_reg_t *) map_get(initial_state->synchronized_variables, field_name_to_get);
+            if (prop) {
+                *r2 = *prop;
+                UNLOCK_SYNCHRONIZED_ACCESS
+                GOTO_NEXT;
+            }
+            UNLOCK_SYNCHRONIZED_ACCESS
+
             //not found? maybe a static variable?
-            char *class_name = (char *) initial_state->class_name;
+            char *class_name = initial_state->class_name;
             z_type_info_t *type_info = (z_type_info_t *) map_get(known_types_map, class_name);
             if (type_info) {
                 z_reg_t *prop = (z_reg_t *) map_get(type_info->static_variables, field_name_to_get);
@@ -747,11 +771,9 @@ OP_SET_FIELD :
     {
         INIT_R1;
         if (r1->type == TYPE_NUMBER) {
-            z_object_t *temp = string_new(num_to_str(r1->number_val));
-            field_name_to_get = temp->operations.to_string(temp);
-            ADD_OBJECT_TO_GC_LIST(temp);
+            field_name_to_get = num_to_str(r1->number_val);
         } else {
-            field_name_to_get = ((z_object_t *) r1->val)->operations.to_string((void *) r1->val);
+            field_name_to_get = strdup(((z_object_t *) r1->val)->operations.to_string((void *) r1->val));
         }
         INIT_R0;
         INIT_R2;
@@ -760,6 +782,7 @@ OP_SET_FIELD :
             //iterate through scopes and set the value when you find
             z_object_t *context = current_context;
             while (context != NULL) {
+                LOCK_SYMBOL_TABLE
                 map_t *symbol_table = context->context_object.symbol_table;
                 if (!symbol_table) {
                     //build symbol table
@@ -769,6 +792,7 @@ OP_SET_FIELD :
                     context->context_object.symbol_table = symbol_table;
                 }
                 int_t *index_ptr = ((int_t *) map_get(symbol_table, field_name_to_get));
+                UNLOCK_SYMBOL_TABLE
                 if (index_ptr) {
                     int_t index = *index_ptr;
                     *(((z_reg_t *) context->context_object.locals) + index) = *r2;
@@ -777,9 +801,13 @@ OP_SET_FIELD :
                 }
                 context = (z_object_t *) context->context_object.parent_context;
             }
-            interpreter_throw_exception_from_str(initial_state, "no such variable found to set");
-            RETURN_IF_ERROR;
-            GOTO_CATCH;
+            // TODO : create a synchronized objects table and make sure that the entry to set is actually there so that
+            // tere is no such case like creating a synchronized variable accidentally.
+            LOCK_SYNCHRONIZED_ACCESS
+            // not found? maybe a synchronized variable?
+            map_insert(initial_state->synchronized_variables, field_name_to_get,r2);
+            UNLOCK_SYNCHRONIZED_ACCESS
+            GOTO_NEXT;
         } else if (r0->type != TYPE_NUMBER) {
             if (r0->type != TYPE_INSTANCE) {
                 if (r0->type == TYPE_CLASS_REF) {
@@ -812,7 +840,6 @@ OP_SET_FIELD :
                         RETURN_IF_ERROR;
                         GOTO_CATCH;
                     }
-                    GOTO_CATCH;
                 }
             }
         }
@@ -864,12 +891,16 @@ OP_CALL :
                 if (function_ref->function_ref_object.is_async) {
                     pthread_t *thread = (pthread_t *) z_alloc_or_die(sizeof(pthread_t));
                     GC_BUSY_LOCK
-                    while (gc_busy) {
-                        pthread_cond_wait(&gc_busy_cond, &gc_busy_lock);
+                    // if someone reaches gc lock, they will need us to sync. so we should do a garbage collection
+                    if (gc_busy) {
+                        z_log("it seems that there is an ongoing gc, will join and then create the new thread\n");
+                        GC_BUSY_UNLOCK
+                        schedule_gc();
                     }
+                    GC_BUSY_UNLOCK
                     THREAD_LIST_LOCK
                     total_thread_count++;
-                    printf("added new thread, count : %d\n", total_thread_count);
+                    z_log("added new thread, count : %d\n", total_thread_count);
                     arraylist_push(thread_list, &thread);
                     init_gc_barrier(total_thread_count);
                     z_async_fnc_args_t *args = (z_async_fnc_args_t *) z_alloc_or_die(
@@ -1033,6 +1064,7 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *objects_state, z_i
                                        char *field_name_to_get) {
     z_object_t *context = (z_object_t *) objects_state->root_context;
     while (context != NULL) {
+        LOCK_SYMBOL_TABLE
         map_t *symbol_table = context->context_object.symbol_table;
         if (!symbol_table) {
             //build symbol table
@@ -1043,6 +1075,7 @@ z_reg_t *interpreter_get_field_virtual(z_interpreter_state_t *objects_state, z_i
         }
         int_t flags = 0;
         int_t *index_ptr = ((int_t *) map_get_flags(symbol_table, field_name_to_get, &flags));
+        UNLOCK_SYMBOL_TABLE
         if (index_ptr) {
             if ((flags & MAP_FLAG_PRIVATE)) {
                 if (strcmp(our_state->class_name, objects_state->class_name) != 0) {
@@ -1069,6 +1102,7 @@ int_t interpreter_set_field_virtual(z_interpreter_state_t *objects_state, z_inte
                                     char *field_name_to_set, z_reg_t *value) {
     objects_state->return_code = 0;
     z_object_t *context = (z_object_t *) objects_state->root_context;
+    LOCK_SYMBOL_TABLE
     map_t *symbol_table = context->context_object.symbol_table;
     if (!symbol_table) {
         //build symbol table
@@ -1079,6 +1113,7 @@ int_t interpreter_set_field_virtual(z_interpreter_state_t *objects_state, z_inte
     }
     int_t flags = 0;
     int_t *index_ptr = ((int_t *) map_get_flags(symbol_table, field_name_to_set, &flags));
+    UNLOCK_SYMBOL_TABLE
     if (index_ptr) {
         if ((flags & MAP_FLAG_PRIVATE)) {
             if (strcmp(our_state->class_name, objects_state->class_name) != 0) {
@@ -1164,5 +1199,6 @@ interpreter_state_new(void *current_context, char *bytes, int_t len, char *class
     initial_state->exception_details = NULL;
     initial_state->root_context = current_context;
     initial_state->stack_start = stack_start;
+    initial_state->synchronized_variables = map_new(sizeof(z_reg_t));
     return initial_state;
 }

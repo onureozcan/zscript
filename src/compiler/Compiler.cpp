@@ -37,7 +37,7 @@ public :
         //ast->print();
         compileClass((ast));
         program->optimize();
-       // program->print();
+        //program->print();
         //exit(0);
         Assembler assembler;
         bytes = assembler.toBytes(program, &len);
@@ -181,6 +181,13 @@ public :
     void compileVar(Var *pVar) {
         uint_t reg = (uint_t) getRegister(pVar->identifier);
         uint_t valueReg = compileExpression(pVar->value, reg);
+        if(pVar->isSynchronized){
+            uint_t tempReg = getRegister(NULL);
+            program->addInstruction(MOV_STR,tempReg,(uint_t)pVar->identifier,0);
+            program->addInstruction(SET_FIELD,1,tempReg,valueReg);
+            freeRegister(tempReg);
+            return;
+        }
         if (valueReg - reg) {
             program->addInstruction(MOV, reg, valueReg, (uint_t) NULL);
             freeRegister(valueReg);

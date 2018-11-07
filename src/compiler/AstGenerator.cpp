@@ -40,11 +40,12 @@ public:
     }
 
     Var *visitVarDeclaration(zeroscriptParser::VariableDeclarationPartContext *part, Body *pKind, bool isStatic,
-                             bool isPrivate) {
+                             bool isPrivate, bool isSynchronized) {
         Var *var = new Var();
         var->setIdentifier(part->variableName->IDENT()->getText().data());
         var->isStatic = isStatic;
         var->isPrivate = isPrivate;
+        var->isSynchronized = isSynchronized;
         if (part->expression()) {
             var->value = visitExpression(part->expression(), pKind);
         } else var->value = new EmptyExpression();
@@ -53,16 +54,17 @@ public:
 
     vector<Var *> *visitVar(zeroscriptParser::VarContext *varcontext, Body *pKind) {
         vector<Var *> *vars = new vector<Var *>();
-        vector<zeroscriptParser::VariableDeclarationPartContext *> declarations = varcontext->variableDeclarationPart();
+        vector<zeroscriptParser::VariableDeclarationPartContext *>
+                declarations = varcontext->variableDeclarationPart();
         if (varcontext->STATIC() != NULL) {
             for (int i = 0; i < declarations.size(); i++) {
                 addStaticVar(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL,
-                                                 varcontext->PRIVATE() != NULL));
+                                                 varcontext->PRIVATE() != NULL, false));
             }
         } else {
             for (int i = 0; i < declarations.size(); i++) {
                 vars->push_back(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL,
-                                                    varcontext->PRIVATE() != NULL));
+                                                    varcontext->PRIVATE() != NULL, varcontext->SYNCHRONIZED() != NULL));
             }
         }
         return vars;
@@ -131,6 +133,7 @@ public:
         Body *body = new Body();
         Statement *stmt = new Statement();
         stmt->stmt = visitExpression(context, body);
+        stmt->hasReturn = true;
         body->statements->push_back(stmt);
         return body;
     }
@@ -172,7 +175,7 @@ public:
         char *b = (strdup(pContext->expression(1)->getText().data()));
         char *buff = static_cast<char *>(malloc(
                 strlen(templateStr) + strlen(a) * 2 + strlen(b) * 2 + 1));
-        sprintf(buff, templateStr,  a, b);
+        sprintf(buff, templateStr, a, b);
         ANTLRInputStream in(buff, strlen(buff));
         zeroscriptLexer lexer(&in);
         CommonTokenStream tokens(&lexer);
@@ -180,7 +183,7 @@ public:
         free(buff);
         free(a);
         free(b);
-        return visitExpression(parser.expression(),pBody);
+        return visitExpression(parser.expression(), pBody);
     }
 
     // a || b ->
@@ -195,7 +198,7 @@ public:
         char *b = (strdup(pContext->expression(1)->getText().data()));
         char *buff = static_cast<char *>(malloc(
                 strlen(templateStr) + strlen(a) * 2 + strlen(b) * 2 + 1));
-        sprintf(buff, templateStr,  a, a, b, b);
+        sprintf(buff, templateStr, a, a, b, b);
         ANTLRInputStream in(buff, strlen(buff));
         zeroscriptLexer lexer(&in);
         CommonTokenStream tokens(&lexer);
@@ -203,7 +206,7 @@ public:
         free(buff);
         free(a);
         free(b);
-        return visitExpression(parser.expression(),pBody);
+        return visitExpression(parser.expression(), pBody);
     }
 
     Expression *visitExpression(zeroscriptParser::ExpressionContext *pContext, Body *pKind) {

@@ -182,7 +182,7 @@ void instruction_print(z_instruction_t instruction) {
     } else if (instruction.opcode == CALL) {
         printf("\t%-5s $%-5d $%-5d", name_opcode(instruction.opcode), (int) instruction.r0, (int) instruction.r1);
     } else if (instruction.opcode == GET_FIELD || instruction.opcode == SET_FIELD) {
-        printf("\t%-5s $%-5d %-5d $%-5d", name_opcode(instruction.opcode), (int) instruction.r0,
+        printf("\t%-5s $%-5d $%-5d $%-5d", name_opcode(instruction.opcode), (int) instruction.r0,
                (int) instruction.r1, (int) instruction.r2);
     } else if (instruction.opcode == GET_FIELD_IMMEDIATE) {
         printf("\t%-5s $%-5d %-5s $%-5d", name_opcode(instruction.opcode), (int) instruction.r0,

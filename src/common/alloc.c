@@ -81,7 +81,7 @@ any_ptr_t z_alloc_or_gc(size_t size) {
 }
 /*
  * //herkes nasilsa buraya gelecek
- * gc(){inux des
+ * gc(){
  *      1- giris bariyeri (diger herkesin gc noktasina ulasmasini bekle)
  *      2- main isen gc yap degilsen gc'nin bitmeisni bekle
  * }
@@ -91,16 +91,14 @@ void schedule_gc() {
     gc_busy = 1;
     pthread_cond_broadcast(&gc_busy_cond);
     GC_BUSY_UNLOCK
-//
-//    printf("awaiting gc barrier 1. thread count: %d\n",total_thread_count);
+
+    z_log("awaiting the first gc barrier. total thread count: %d\n", total_thread_count);
     int ret = pthread_barrier_wait(&gc_safe_barrier);
-//    puts("reached");
     if (ret == PTHREAD_BARRIER_SERIAL_THREAD) {
         gc();
     }
-//    puts("awaiting gc barrier 2");
+    z_log("awaiting the second gc barrier, total thread count: %d\n", total_thread_count);
     pthread_barrier_wait(&gc_safe_barrier);
-//    puts("reached");
 
     GC_BUSY_LOCK
     gc_busy = 0;
