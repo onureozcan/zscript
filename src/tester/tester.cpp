@@ -9,7 +9,7 @@
 
 // test if a given script behaves as expected without corrupting memory
 void test(const char *script) {
-    printf("%s..............",script);
+    printf("running %s..............\n",script);
     const char *template_str = "valgrind --quiet --memcheck:leak-check=no --error-exitcode=1 ./zero %s >> /dev/null";
     size_t len = strlen(template_str) + strlen(script) + 1;
     char *buff = (char *) malloc(len);
@@ -29,5 +29,6 @@ int main() {
     test("../test_scripts/RecursiveFibonacci.zs");
     test("../test_scripts/CombinatorFunctionTest.zs");
     test("../test_scripts/AsyncModifySharedDataTest.zs");
+    test("../test_scripts/AsyncFunctionTest2.zs");
     return 0;
 }

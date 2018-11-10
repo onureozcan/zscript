@@ -20,6 +20,7 @@
 
 #define ADD_OBJECT_TO_GC_LIST(c) GC_LIST_LOCK arraylist_push(gc_objects_list,&(c)); GC_LIST_UNLOCK
 #define ADD_ROOT_TO_GC_LIST(c) GC_LIST_LOCK arraylist_push(interpreter_states_list,&(c)); GC_LIST_UNLOCK
+#define REMOVE_ROOT_FROM_GC_ROOT_LIST(c) (c)->removed_as_a_root = 1;
 #define CREATE_STACK(s) (z_reg_t *) (z_alloc_or_die((s) * sizeof(z_reg_t)));
 
 pthread_mutex_t symbol_table_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -30,6 +31,11 @@ pthread_mutex_t symbol_table_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t synchronized_access_lock = PTHREAD_MUTEX_INITIALIZER;
 #define LOCK_SYNCHRONIZED_ACCESS pthread_mutex_lock(&synchronized_access_lock);
 #define UNLOCK_SYNCHRONIZED_ACCESS pthread_mutex_unlock(&synchronized_access_lock);
+
+pthread_mutex_t interpreter_is_running_lock = PTHREAD_MUTEX_INITIALIZER;
+#define LOCK_INTERPRETER_IS_RUNNING pthread_mutex_lock(&interpreter_is_running_lock);
+#define UNLOCK_INTERPRETER_IS_RUNNING pthread_mutex_unlock(&interpreter_is_running_lock);
+
 
 typedef struct z_reg_t {
     int_t type;
@@ -74,6 +80,8 @@ typedef struct z_interpreter_state_t {
     z_reg_t return_value;
     z_reg_t *stack_ptr;
     z_reg_t *stack_start;
+    half_int_t is_running;
+    half_int_t removed_as_a_root;
 } z_interpreter_state_t;
 
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state);
@@ -155,6 +163,8 @@ void *run_async(void *argsv);
 
 void z_thread_gc_safe_end_thread();
 
+z_interpreter_state_t *clone_state(z_interpreter_state_t *pState);
+
 void *run_async(void *argsv) {
     z_async_fnc_args_t *args = (z_async_fnc_args_t *) (argsv);
     z_interpreter_state_t *initial_state = args->initial_state;
@@ -203,6 +213,10 @@ void z_thread_gc_safe_end_thread() {
  * @return modified state.
  */
 z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
+    LOCK_INTERPRETER_IS_RUNNING
+    initial_state->is_running = 1;
+    UNLOCK_INTERPRETER_IS_RUNNING
+
     char *byte_stream = (char *) z_alloc_or_die((size_t) initial_state->fsize);
     memcpy(byte_stream, initial_state->byte_stream, (size_t) initial_state->fsize);
     int_t fsize = initial_state->fsize;
@@ -863,7 +877,17 @@ OP_CALL :
             z_object_t *function_ref = (z_object_t *) r0->val;
             //someone else's function...
             if (function_ref->function_ref_object.responsible_interpreter_state != initial_state) {
+                int_t cloned_state = 0;
                 z_interpreter_state_t *other_state = function_ref->function_ref_object.responsible_interpreter_state;
+                // if the same instance runs again, it crashes the vm because of a concurrency problem
+                // to solve this, create a clone of the state.
+                LOCK_INTERPRETER_IS_RUNNING
+                if (other_state->is_running){
+                    other_state = clone_state(other_state);
+                    cloned_state = 1;
+                    ADD_ROOT_TO_GC_LIST(other_state);
+                }
+                UNLOCK_INTERPRETER_IS_RUNNING
                 z_object_t *called_fnc = context_new();
                 called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
                 called_fnc->context_object.return_context = NULL;
@@ -874,6 +898,9 @@ OP_CALL :
                 other_state->stack_start = initial_state->stack_start;
                 other_state->current_context = called_fnc;
                 z_interpreter_run(other_state);
+                if (cloned_state){
+                    REMOVE_ROOT_FROM_GC_ROOT_LIST(other_state);
+                }
                 if (other_state->return_code) {
                     //exception thrown
                     interpreter_throw_exception_from_str(initial_state, other_state->exception_details);
@@ -1021,11 +1048,15 @@ OP_CREATE_THIS :
         GOTO_NEXT;
     };
 end:
-
-#ifdef PRE_CALCULATE_DISPATCH_POINTERS
-    z_free(byte_stream);
-#endif
+    LOCK_INTERPRETER_IS_RUNNING
+    initial_state->is_running = 0;
+    UNLOCK_INTERPRETER_IS_RUNNING
     return initial_state;
+}
+
+z_interpreter_state_t *clone_state(z_interpreter_state_t *state) {
+    z_interpreter_state_t* clone = interpreter_state_new(state->current_context,state->byte_stream,state->fsize,state->class_name,state->stack_ptr,state->stack_start);
+    return clone;
 }
 
 void goto_catch_block(const z_interpreter_state_t *initial_state,
@@ -1200,5 +1231,7 @@ interpreter_state_new(void *current_context, char *bytes, int_t len, char *class
     initial_state->root_context = current_context;
     initial_state->stack_start = stack_start;
     initial_state->synchronized_variables = map_new(sizeof(z_reg_t));
+    initial_state->removed_as_a_root = 0;
+    initial_state->is_running = 0;
     return initial_state;
 }

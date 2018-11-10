@@ -29,9 +29,12 @@ uhalf_int_t gc_version = 0;
 
 int_t gc() {
     gc_version++;
-    for (int_t i = 0; i < interpreter_states_list->size; i++) {
+        for (int_t i = 0; i < interpreter_states_list->size; i++) {
         z_interpreter_state_t *state = *(z_interpreter_state_t **) arraylist_get(interpreter_states_list, i);
-        gc_visit_state(state);
+        // if it is a removed gc root, skip it
+        if(!state->removed_as_a_root) {
+            gc_visit_state(state);
+        }
     }
     arraylist_t *new_list = arraylist_new_capacity(sizeof(int_t),gc_objects_list->size / sizeof(int_t) );
     for (int_t i = 0; i < gc_objects_list->size; i++) {
