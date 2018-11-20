@@ -4,25 +4,22 @@
 int_t heap_limit = 1 * (1024 * 1024);
 int_t used_heap = 0;
 int_t total_thread_count = 1;
-int_t gc_busy = 0;
+int_t gc_barrier_unstable = 0;
 
 pthread_mutex_t used_heap_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t gc_list_lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t gc_busy_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t gc_barrier_unstable_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t thread_list_lock = PTHREAD_MUTEX_INITIALIZER;
 
-pthread_cond_t gc_busy_cond = PTHREAD_COND_INITIALIZER;
-
-pthread_barrier_t gc_safe_barrier;
+pthread_barrier_t* gc_safe_barrier;
+pthread_barrier_t gc_safe_barrier2;
+pthread_barrier_t gc_safe_barrier1;
 
 #define USED_HEAP_LOCK pthread_mutex_lock(&used_heap_lock);
 #define USED_HEAP_UNLOCK pthread_mutex_unlock(&used_heap_lock);
 
 #define GC_LIST_LOCK pthread_mutex_lock(&gc_list_lock);
 #define GC_LIST_UNLOCK pthread_mutex_unlock(&gc_list_lock);
-
-#define GC_BUSY_LOCK pthread_mutex_lock(&gc_busy_lock);
-#define GC_BUSY_UNLOCK pthread_mutex_unlock(&gc_busy_lock);
 
 #define THREAD_LIST_LOCK pthread_mutex_lock(&thread_list_lock);
 #define THREAD_LIST_UNLOCK pthread_mutex_unlock(&thread_list_lock);
@@ -69,7 +66,7 @@ any_ptr_t z_alloc_or_gc(size_t size) {
     USED_HEAP_LOCK
     used_heap += size;
     USED_HEAP_UNLOCK
-    if(used_heap > heap_limit){
+    if (used_heap > heap_limit) {
         schedule_gc();
     }
     any_ptr_t ptr = Z_MALLOC(size);
@@ -79,34 +76,26 @@ any_ptr_t z_alloc_or_gc(size_t size) {
     ptr = z_decorate_ptr(ptr, size);
     return ptr;
 }
-/*
- * //herkes nasilsa buraya gelecek
- * gc(){
- *      1- giris bariyeri (diger herkesin gc noktasina ulasmasini bekle)
- *      2- main isen gc yap degilsen gc'nin bitmeisni bekle
- * }
- * */
+
+void init_gc_barrier(pthread_barrier_t* barrier,int_t count) {
+    pthread_barrier_destroy(barrier);
+    pthread_barrier_init(barrier, NULL, (unsigned int) count);
+}
+
+int gc_count = 0;
 void schedule_gc() {
-    GC_BUSY_LOCK
-    gc_busy = 1;
-    pthread_cond_broadcast(&gc_busy_cond);
-    GC_BUSY_UNLOCK
-
+    // pick the barrier to wait
+    gc_safe_barrier = gc_count % 2 == 0 ? &gc_safe_barrier1 : &gc_safe_barrier2;
     z_log("awaiting the first gc barrier. total thread count: %d\n", total_thread_count);
-    int ret = pthread_barrier_wait(&gc_safe_barrier);
+    int ret = pthread_barrier_wait(gc_safe_barrier);
     if (ret == PTHREAD_BARRIER_SERIAL_THREAD) {
+        gc_count++;
+        // gc..
         gc();
+        // initialize the other barrier
+        pthread_barrier_t* barrier_to_reinitialize = gc_count % 2 == 0 ? &gc_safe_barrier1 : &gc_safe_barrier2;
+        init_gc_barrier(barrier_to_reinitialize,total_thread_count);
     }
-    z_log("awaiting the second gc barrier, total thread count: %d\n", total_thread_count);
-    pthread_barrier_wait(&gc_safe_barrier);
-
-    GC_BUSY_LOCK
-    gc_busy = 0;
-    pthread_cond_broadcast(&gc_busy_cond);
-    GC_BUSY_UNLOCK
+    pthread_barrier_wait(gc_safe_barrier);
 }
 
-void init_gc_barrier(int_t count){
-    pthread_barrier_destroy(&gc_safe_barrier);
-    pthread_barrier_init(&gc_safe_barrier, NULL, (unsigned int) count);
-}

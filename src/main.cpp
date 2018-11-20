@@ -61,8 +61,8 @@ int main(int argc, const char *argv[]) {
     if (runMode) {
         printf("run script %s\n",filename);
         clock_t begin = clock();
-        pthread_barrier_init(&gc_safe_barrier, NULL, 1);
-        pthread_barrier_init(&gc_safe_barrier, NULL, 1);
+        pthread_barrier_init(&gc_safe_barrier1, NULL, 1);
+        pthread_barrier_init(&gc_safe_barrier2, NULL, 1);
         thread_list = arraylist_new(sizeof(int_t));
         char *class_name = (char *) (z_alloc_or_gc(strlen(filename) + 1));
         strcpy(class_name, filename);

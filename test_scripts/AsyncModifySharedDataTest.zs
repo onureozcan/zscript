@@ -2,7 +2,7 @@ class AsyncModifySharedDataTest(){
 
     synchronized var osman = 0;
     synchronized var opCount = 0;
-    synchronized var limit = 1000;
+    synchronized var limit = 10000;
 
     // any of these cross thread accesses should not corrupt each other's data
     modifyOsmanAsync(1);
