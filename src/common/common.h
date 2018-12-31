@@ -13,7 +13,7 @@
 #define FLOAT_SUPPORT
 #define TRUE 1
 #define FALSE 0
-#define PRINT_LOGS
+//#define PRINT_LOGS
 
 long long current_milliseconds(void) {
     struct timeval tv;

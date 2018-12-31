@@ -30,5 +30,6 @@ int main() {
     test("../test_scripts/CombinatorFunctionTest.zs");
     test("../test_scripts/AsyncModifySharedDataTest.zs");
     test("../test_scripts/AsyncFunctionTest2.zs");
+    test("../test_scripts/VarargFunctionTest.zs");
     return 0;
 }

@@ -64,14 +64,14 @@ public :
         uint_t index = program->addInstruction(FFRAME, (uint_t) NULL, (uint_t) NULL,
                                                (uint_t) NULL);
         functionsStack->push(func);
-        int i = (int) (func->arguments->identifiers->size()) - 1;
+        /*int i = (int) (func->arguments->identifiers->size()) - 1;
         for (i = 0; i < (int) (func->arguments->identifiers->size()); i++) {
             char *ident = func->arguments->identifiers->at(i)->data;
             uint_t identReg = (uint_t) (func->getRegister(ident));
             program->addComment("pop arg %i (%s)", i, ident);
             program->addInstruction(POP, identReg, (uint_t) NULL,
                                     (uint_t) NULL);
-        }
+        }*/
         program->addComment("mov function ptr to register for %s", func->identifier);
         program->addInstruction(MOV_FNC, (uint_t) getRegister(func->identifier),
                                 (uint64_t) func->identifier, static_cast<uint_t>(func->isAsync));

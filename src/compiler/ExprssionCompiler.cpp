@@ -115,7 +115,7 @@ public:
         exprResultReg = compileExpression(pMethodCall->callee);//compileIdentifier(pMethodCall->identifier);
         program->addInstruction(CALL,
                                 (uint_t) exprResultReg, (uint_t) resultReg,
-                                (uint_t) NULL);
+                                (uint_t) expressions->size());
         freeRegister(exprResultReg);
         return resultReg;
     }

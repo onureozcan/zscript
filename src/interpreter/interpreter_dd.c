@@ -50,8 +50,8 @@ typedef struct z_reg_t {
 } z_reg_t;
 
 typedef struct z_native_return_value {
-    z_reg_t* stack_ptr;
-    char* error_message;
+    z_reg_t *stack_ptr;
+    char *error_message;
 } z_native_return_value;
 
 char *num_to_str(FLOAT val);
@@ -71,7 +71,7 @@ typedef struct z_interpreter_state_t {
     // exception message (if so)
     char *exception_details;
     // synchronized variables. access to them is protected by mutexes.
-    map_t* synchronized_variables;
+    map_t *synchronized_variables;
     int_t return_code;
     // byte code file size
     int_t fsize;
@@ -109,6 +109,7 @@ void interpreter_throw_exception_from_str(z_interpreter_state_t *current_state, 
 #include "object.h"
 #include "event_queue.c"
 #include "native_functions.c"
+void z_interpreter_set_arguments_count(z_interpreter_state_t *initial_state, int_t arguments_count);
 #include "object.c"
 
 Z_INLINE char *num_to_str(
@@ -188,7 +189,8 @@ void *run_async(void *argsv) {
     z_thread_gc_safe_end_thread();
     return NULL;
 }
-void z_thread_gc_safe_start_thread(pthread_t* thread, void* args){
+
+void z_thread_gc_safe_start_thread(pthread_t *thread, void *args) {
     z_log("trying to add thread\n");
     THREAD_LIST_LOCK
     total_thread_count++;
@@ -228,7 +230,6 @@ z_interpreter_state_t *z_interpreter_run(z_interpreter_state_t *initial_state) {
     char *field_name_to_get;
 
     z_object_t *object_to_search_on = NULL;
-
     z_reg_t *locals_ptr = NULL;
     z_instruction_t *instruction_ptr;
 
@@ -372,7 +373,7 @@ OP_INC:
     {
         INIT_R0;
         INIT_R1;
-        r0->number_val ++;
+        r0->number_val++;
         *r1 = *r0;
         GOTO_NEXT;
     };
@@ -380,7 +381,7 @@ OP_DEC:
     {
         INIT_R0;
         INIT_R1;
-        r0->number_val --;
+        r0->number_val--;
         *r1 = *r0;
         GOTO_NEXT;
     };
@@ -678,7 +679,7 @@ OP_GET_FIELD_IMMEDIATE :
     fieldNameSet:;
         uint_t lookup_object = instruction_ptr->r0;
         //first search native functions
-        z_native_fnc_t* native_fnc_ptr_ptr = (z_native_fnc_t*)map_get(native_functions, field_name_to_get);
+        z_native_fnc_t *native_fnc_ptr_ptr = (z_native_fnc_t *) map_get(native_functions, field_name_to_get);
         if (native_fnc_ptr_ptr) {
             INIT_R2;
             r2->val = (uint_t) (*native_fnc_ptr_ptr);
@@ -822,7 +823,7 @@ OP_SET_FIELD :
             // tere is no such case like creating a synchronized variable accidentally.
             LOCK_SYNCHRONIZED_ACCESS
             // not found? maybe a synchronized variable?
-            map_insert(initial_state->synchronized_variables, field_name_to_get,r2);
+            map_insert(initial_state->synchronized_variables, field_name_to_get, r2);
             UNLOCK_SYNCHRONIZED_ACCESS
             GOTO_NEXT;
         } else if (r0->type != TYPE_NUMBER) {
@@ -867,7 +868,7 @@ OP_CALL :
         INIT_R0;
         if (r0->type == TYPE_NATIVE_FUNC) {
             //call native function
-            z_native_fnc_t native_fnc = (z_native_fnc_t ) r0->val;
+            z_native_fnc_t native_fnc = (z_native_fnc_t) r0->val;
             INIT_R1;
             struct z_native_return_value ret = native_fnc(initial_state->stack_ptr, r1, object_to_search_on);
             initial_state->stack_ptr = ret.stack_ptr;
@@ -878,14 +879,16 @@ OP_CALL :
             }
         } else if (r0->type == TYPE_FUNCTION_REF) {
             z_object_t *function_ref = (z_object_t *) r0->val;
-            //someone else's function...
+            int_t arguments_count = instruction_ptr->r2;
+            z_interpreter_set_arguments_count(initial_state, arguments_count);
+            // someone else's function...
             if (function_ref->function_ref_object.responsible_interpreter_state != initial_state) {
                 int_t cloned_state = 0;
                 z_interpreter_state_t *other_state = function_ref->function_ref_object.responsible_interpreter_state;
                 // if the same instance runs again, it crashes the vm because of a concurrency problem
                 // to solve this, create a clone of the state.
                 LOCK_INTERPRETER_IS_RUNNING
-                if (other_state->is_running){
+                if (other_state->is_running) {
                     other_state = clone_state(other_state);
                     cloned_state = 1;
                     ADD_ROOT_TO_GC_LIST(other_state);
@@ -901,7 +904,7 @@ OP_CALL :
                 other_state->stack_start = initial_state->stack_start;
                 other_state->current_context = called_fnc;
                 z_interpreter_run(other_state);
-                if (cloned_state){
+                if (cloned_state) {
                     REMOVE_ROOT_FROM_GC_ROOT_LIST(other_state);
                 }
                 if (other_state->return_code) {
@@ -928,9 +931,7 @@ OP_CALL :
                     memcpy(copied_stack, initial_state->stack_start, stack_file_size * sizeof(z_reg_t));
                     args->stack_start = copied_stack;
                     args->stack_ptr = &copied_stack[(initial_state->stack_ptr - initial_state->stack_start)];
-                    z_thread_gc_safe_start_thread(thread,args);
-
-                    //GC_BUSY_UNLOCK
+                    z_thread_gc_safe_start_thread(thread, args);
                     GOTO_NEXT;
                 } else {
                     called_fnc->context_object.parent_context = function_ref->function_ref_object.parent_context;
@@ -949,7 +950,6 @@ OP_CALL :
             z_type_info_t *type_info = object_manager_get_or_load_type_info(initial_state->class_name, NULL);
             object_new(((z_object_t *) r0->val)->class_ref_object.value, type_info->imports_table,
                        initial_state->stack_start, initial_state->stack_ptr, r1);
-            //r1->type = TYPE_INSTANCE;
         } else {
             interpreter_throw_exception_from_str(initial_state, "callee is not a function");
             RETURN_IF_ERROR;
@@ -1001,6 +1001,14 @@ OP_FFRAME :
         locals_ptr = (z_reg_t *) z_alloc_or_die(byte_size_locals);
         memset(locals_ptr, 0, byte_size_locals);
 
+        int_t arguments_count = initial_state->stack_ptr->val;
+        initial_state->stack_ptr--;
+        // place arguments
+        // note that the first 2 locals are reserved.
+        // the 3rd var is the function itself
+        for (int_t i = 3; i < arguments_count + 3; i++) {
+            locals_ptr[i] = *(initial_state->stack_ptr--);
+        }
         // place this variable
         z_object_t *root_context = (z_object_t *) (initial_state->root_context);
         if (root_context->context_object.locals != NULL)
@@ -1015,7 +1023,7 @@ OP_FFRAME :
         if (instruction_ptr->r2) {
             int_t end_of_function = instruction_ptr->r2;
             int_t start_of_function = ((uint_t) (instruction_ptr)) - (uint_t) byte_stream;
-            int_t bytes_to_go = end_of_function - start_of_function ;
+            int_t bytes_to_go = end_of_function - start_of_function;
 
             for (long i = 0; i < bytes_to_go; i += sizeof(z_instruction_t)) {
                 z_instruction_t *instruction = (z_instruction_t *) (i + (uint_t) instruction_ptr);
@@ -1044,8 +1052,18 @@ end:
     return initial_state;
 }
 
+void z_interpreter_set_arguments_count(z_interpreter_state_t *initial_state, int_t arguments_count) {
+    z_reg_t args_count_reg;
+    args_count_reg.type = TYPE_NUMBER;
+    args_count_reg.val = arguments_count;
+
+    initial_state->stack_ptr++;
+    *initial_state->stack_ptr = args_count_reg;
+}
+
 z_interpreter_state_t *clone_state(z_interpreter_state_t *state) {
-    z_interpreter_state_t* clone = interpreter_state_new(state->current_context,state->byte_stream,state->fsize,state->class_name,state->stack_ptr,state->stack_start);
+    z_interpreter_state_t *clone = interpreter_state_new(state->current_context, state->byte_stream, state->fsize,
+                                                         state->class_name, state->stack_ptr, state->stack_start);
     return clone;
 }
 
@@ -1069,6 +1087,7 @@ void interpreter_run_static_constructor(char *bytes, uint_t len, char *class_nam
     z_object_t *context = context_new();
     z_interpreter_state_t *temp_state = interpreter_state_new(context, bytes, len, class_name, NULL,
                                                               NULL);
+    z_interpreter_set_arguments_count(temp_state, 0);
     temp_state->instruction_pointer = static_block_ptr;
     z_interpreter_run(temp_state);
     ADD_ROOT_TO_GC_LIST(temp_state);

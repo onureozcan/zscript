@@ -150,6 +150,7 @@ object_new(char *class_name, map_t *imports_table, z_reg_t *stack_start, z_reg_t
         obj->instance_object.saved_state = initial_state;
         obj->type = TYPE_INSTANCE;
         ADD_OBJECT_TO_GC_LIST(obj);
+        z_interpreter_set_arguments_count(initial_state,0);
         z_interpreter_run(initial_state);
         return obj;
     }

@@ -70,6 +70,7 @@ int main(int argc, const char *argv[]) {
         z_interpreter_state_t *initial_state = interpreter_state_new(context_new(), bytes, len, class_name, NULL, NULL);
         ADD_ROOT_TO_GC_LIST(initial_state);
         object_manager_register_object_type(class_name, bytes, len);
+        z_interpreter_set_arguments_count(initial_state,0);
         interpreter_run_static_constructor(bytes, len, class_name);
         initial_state = z_interpreter_run(initial_state);
         if (initial_state->return_code) {
