@@ -1,6 +1,6 @@
 class AsyncFunctionTest2(){
 
-    synchronized var limit = 100000;
+    tshared var limit = 100000;
 
     // when more than one thread tries to call the same function state it used to crash the vm.
     // this test tests if this bug still exists or not

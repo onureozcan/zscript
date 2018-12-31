@@ -82,7 +82,7 @@ function:
     ;
 
 var:
-    PRIVATE? (STATIC|SYNCHRONIZED)? VAR variableDeclarationPart  (',' variableDeclarationPart)*
+    PRIVATE? (STATIC|TSHARED)? VAR variableDeclarationPart  (',' variableDeclarationPart)*
     ;
 
 variableDeclarationPart:
@@ -187,7 +187,7 @@ IMPORT             : 'import';
 AS                 : 'as';
 ASYNC              : 'async';
 PRIVATE            : 'private';
-SYNCHRONIZED       : 'synchronized';
+TSHARED            : 'tshared';
 
 // Literals
 INT             : '0'|[1-9][0-9]* ;

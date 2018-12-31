@@ -64,7 +64,7 @@ public:
         } else {
             for (int i = 0; i < declarations.size(); i++) {
                 vars->push_back(visitVarDeclaration(declarations.at(i), pKind, varcontext->STATIC() != NULL,
-                                                    varcontext->PRIVATE() != NULL, varcontext->SYNCHRONIZED() != NULL));
+                                                    varcontext->PRIVATE() != NULL, varcontext->TSHARED() != NULL));
             }
         }
         return vars;
