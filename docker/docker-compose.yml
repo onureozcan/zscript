@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+    build:
+        image: antrl_cpp_env
+        container_name: zscript_build_container
+        build: .
+        volumes:
+            - ..:/Zscript
+            - ../test_scripts:/test_scripts
+        command:
+            - /Zscript/docker/build_cmake.sh
