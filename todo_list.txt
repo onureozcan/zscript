@@ -1,0 +1,14 @@
+----- short term todoes (not in order) ------
+docker build
+automatic testing after each build
+refactoring
+write a language specification
+write a developer document
+async functions must return a thread handle which than can be used to suspend, stop or start a thread? (so that manual gc calls in loops to prevent vm from freezing can be avoided)
+garbage collection of static and thread_shared variables
+checking of thread_shared table entries for existence to prevent creating a thread_shared variable accidentally
+synchronize static variables
+throw exception on cross thread access performed on a non-thread_shared variable
+synchronize array and json operations
+synchronize async function arguments
+dispose field_name_to_get
