@@ -36,7 +36,7 @@ int_t gc() {
             gc_visit_state(state);
         }
     }
-    arraylist_t *new_list = arraylist_new_capacity(sizeof(int_t),gc_objects_list->size / sizeof(int_t) );
+    arraylist_t *new_list = arraylist_new_capacity(sizeof(int_t),gc_objects_list->size );
     for (int_t i = 0; i < gc_objects_list->size; i++) {
         z_object_t *object = *(z_object_t **) arraylist_get(gc_objects_list, i);
         if (object->gc_version != gc_version) {
