@@ -21,6 +21,7 @@ char *compile_file(const char *filename, size_t *len) {
     zeroscriptLexer lexer(&input);
     CommonTokenStream tokens(&lexer);
     zeroscriptParser parser(&tokens);
+    z_log("%s\n", filename);
     AstGenerator astGenerator = AstGenerator(parser.classDeclaration());
     ClassDeclaration *cls = astGenerator.getRootClass();
     Compiler compiler = Compiler(cls);
@@ -59,7 +60,7 @@ int main(int argc, const char *argv[]) {
     char *bytes = compile_file(file_path, &len);
     object_manager_init(class_path);
     if (runMode) {
-        printf("run script %s\n",filename);
+        printf("run script %s\n", filename);
         clock_t begin = clock();
         pthread_barrier_init(&gc_safe_barrier1, NULL, 1);
         pthread_barrier_init(&gc_safe_barrier2, NULL, 1);
@@ -70,7 +71,7 @@ int main(int argc, const char *argv[]) {
         z_interpreter_state_t *initial_state = interpreter_state_new(context_new(), bytes, len, class_name, NULL, NULL);
         ADD_ROOT_TO_GC_LIST(initial_state);
         object_manager_register_object_type(class_name, bytes, len);
-        z_interpreter_set_arguments_count(initial_state,0);
+        z_interpreter_set_arguments_count(initial_state, 0);
         interpreter_run_static_constructor(bytes, len, class_name);
         initial_state = z_interpreter_run(initial_state);
         if (initial_state->return_code) {
