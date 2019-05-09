@@ -175,6 +175,7 @@ void *run_async(void *argsv) {
                                                                initial_state->fsize, initial_state->class_name,
                                                                args->stack_ptr,
                                                                args->stack_start);
+    // inherit thread shared variables from parent state
     map_free(other_state->synchronized_variables);
     other_state->synchronized_variables = initial_state->synchronized_variables;
     ADD_ROOT_TO_GC_LIST(other_state);

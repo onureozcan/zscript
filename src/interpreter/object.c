@@ -15,6 +15,8 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
 
 char *resolve_imported_class_name(char *class_name, map_t *imports_table);
 
+arraylist_t* known_types_list = 0;
+
 #include "garbage_collector.h"
 
 char *class_path = 0;
@@ -61,6 +63,7 @@ void object_manager_init(char *cp) {
     }
 
     known_types_map = map_new(sizeof(z_type_info_t));
+    known_types_list = arraylist_new(sizeof(z_type_info_t));
 }
 
 /**
@@ -83,6 +86,10 @@ z_type_info_t *object_manager_get_or_load_type_info(char *class_name, map_t *imp
         map_insert(type_info->imports_table, alias, &resolved);
     }
     return type_info;
+}
+
+arraylist_t* object_manager_get_known_classes(){
+    return known_types_list;
 }
 
 char *resolve_imported_class_name(char *class_name, map_t *imports_table) {
@@ -109,6 +116,7 @@ void object_manager_register_object_type(char *class_name, char *bytecodes, int_
     type_info->static_variables = map_new(sizeof(z_reg_t));
     type_info->imports_table = map_new(sizeof(char *));
     map_insert(known_types_map, class_name, type_info);
+    arraylist_push(known_types_list, type_info);
 }
 
 /**

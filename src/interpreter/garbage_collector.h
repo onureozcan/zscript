@@ -29,13 +29,25 @@ uhalf_int_t gc_version = 0;
 
 int_t gc() {
     gc_version++;
-        for (int_t i = 0; i < interpreter_states_list->size; i++) {
+    // iterate all the objects
+    for (int_t i = 0; i < interpreter_states_list->size; i++) {
         z_interpreter_state_t *state = *(z_interpreter_state_t **) arraylist_get(interpreter_states_list, i);
         // if it is a removed gc root, skip it
-        if(!state->removed_as_a_root) {
+        if (!state->removed_as_a_root) {
             gc_visit_state(state);
         }
     }
+    // iterate static variables
+    arraylist_t* known_types = object_manager_get_known_classes();
+    for(int i = 0; i < known_types->size;i++){
+        z_type_info_t* type = (z_type_info_t*)arraylist_get(known_types,i);
+        map_t* static_variable_map = type->static_variables;
+        arraylist_t* static_variable_names = map_key_list(static_variable_map);
+        for(int j = 0;j<static_variable_names->size;j++){
+            gc_visit_register((z_reg_t*)map_get(static_variable_map,*(char**)arraylist_get(static_variable_names,j)));
+        }
+    }
+
     arraylist_t *new_list = arraylist_new_capacity(sizeof(int_t),gc_objects_list->size );
     for (int_t i = 0; i < gc_objects_list->size; i++) {
         z_object_t *object = *(z_object_t **) arraylist_get(gc_objects_list, i);

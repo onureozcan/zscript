@@ -5,10 +5,11 @@ refactoring
 write a language specification
 write a developer document
 async functions must return a thread handle which than can be used to suspend, stop or start a thread? (so that manual gc calls in loops to prevent vm from freezing can be avoided)
-garbage collection of static and thread_shared variables
+garbage collection of thread_shared variables
 checking of thread_shared table entries for existence to prevent creating a thread_shared variable accidentally
 synchronize static variables
 throw exception on cross thread access performed on a non-thread_shared variable
 synchronize array and json operations
 synchronize async function arguments
 dispose field_name_to_get
+add optimization based on type inferences (like if can make sure that a variable is number, optimize its calls to a proper path)
