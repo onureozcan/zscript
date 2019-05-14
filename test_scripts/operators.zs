@@ -8,7 +8,7 @@ class Operators() {
     print("length of `selami` is "+ "selami".length());
 
     var testObj = new Object();
-    testObj.osman = "osman";
+    testObj.osman = "osman value";
     testObj[2] = "VELI";
     print("an arbitrary property (osman) that is defined on an object is :" + testObj.osman);
     print("an arbitrary numeric property (2) that is defined on an object is :" + testObj[2]);
@@ -69,5 +69,7 @@ class Operators() {
     for(var i = 1; i > 0 and i < 4;i++ ){
         print(i);
     }
+
+    print("1 or 1 and 0:"+ (1 or 1 and 0));
 
 }

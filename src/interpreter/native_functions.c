@@ -132,8 +132,10 @@ z_native_return_value native_object_key_list(z_reg_t *stack, z_reg_t *return_reg
         arraylist_t *keys = map_key_list(object->properties);
         for (int_t i = 0; i < keys->size; i++) {
             char *value = *(char **) arraylist_get(keys, i);
+            char *copied = (char *) z_alloc_or_gc(strlen(value) + 1);
+            strcpy(copied, value);
             z_reg_t value_reg;
-            value_reg.val = (int_t) string_new(value);
+            value_reg.val = (int_t) string_new(copied);
             value_reg.type = TYPE_STR;
             map_insert(ret->properties, num_to_str(i), &value_reg);
             ADD_OBJECT_TO_GC_LIST(value_reg.val);

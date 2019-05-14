@@ -846,11 +846,11 @@ OP_SET_FIELD :
                 } else {
                     object_to_search_on = (z_object_t *) r0->val;
                     map_insert(object_to_search_on->properties, field_name_to_get, r2);
-                    //we changed a property and the cache is now garbage.
+                    // we changed a property and the cache is now garbage.
                     object_to_search_on->key_list_cache = NULL;
                 }
             } else {
-                //set field by using symbol table of this instance
+                // set field by using symbol table of this instance
                 object_to_search_on = (z_object_t *) r0->val;
                 z_interpreter_state_t *state = object_to_search_on->instance_object.saved_state;
                 if (interpreter_set_field_virtual(state, initial_state, field_name_to_get, r2)) {
@@ -907,6 +907,7 @@ OP_CALL :
                 z_interpreter_run(other_state);
                 if (cloned_state) {
                     REMOVE_ROOT_FROM_GC_ROOT_LIST(other_state);
+                    // TODO: dispose other_state, this leads to a memory leak
                 }
                 if (other_state->return_code) {
                     //exception thrown
@@ -1007,8 +1008,8 @@ OP_FFRAME :
         // place arguments
         // note that the first 2 locals are reserved.
         // the 3rd var is the function itself
-        for (int_t i = 3; i < arguments_count + 3; i++) {
-            locals_ptr[i] = *(initial_state->stack_ptr--);
+        for (int_t i = 0; i < arguments_count; i++) {
+            locals_ptr[i + 3] = *(initial_state->stack_ptr--);
         }
         // place this variable
         z_object_t *root_context = (z_object_t *) (initial_state->root_context);
